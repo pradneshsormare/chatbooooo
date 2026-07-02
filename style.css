@@ -1,0 +1,332 @@
+/* --- CSS Variables and General Styling --- */
+:root {
+    /* StudyBot Light Theme (matching front.html) */
+    --primary: #7E57C2;
+    --primary-light: #B39DDB;
+    --primary-dark: #5E35B1;
+    --secondary: #26A69A;
+    --accent: #FF7043;
+    --text-dark: #37474F;
+    --text-light: #ECEFF1;
+    --bg-light: #F5F7FA;
+    --card-bg: #FFFFFF;
+    
+    /* Message Bubbles Colors */
+    --user-msg: #7E57C2;
+    --bot-msg: #E8EAF6;
+    
+    --shadow: 0 4px 20px rgba(126, 87, 194, 0.1);
+    --font-family: 'Poppins', sans-serif;
+}
+
+* {
+    box-sizing: border-box;
+    margin: 0;
+    padding: 0;
+}
+
+body {
+    font-family: var(--font-family);
+    background: linear-gradient(135deg, #f5f7fa 0%, #e8eaf6 100%);
+    display: flex;
+    flex-direction: column;
+    height: 100vh;
+    color: var(--text-dark);
+    overflow: hidden;
+}
+
+/* --- Navbar --- */
+.navbar {
+    background-color: rgba(255, 255, 255, 0.9);
+    backdrop-filter: blur(10px);
+    border-bottom: 1px solid rgba(126, 87, 194, 0.15);
+    color: var(--text-dark);
+    padding: 0.75rem 2rem;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    box-shadow: 0 2px 10px rgba(0, 0, 0, 0.05);
+    z-index: 100;
+}
+
+.logo {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    font-weight: 700;
+    font-size: 1.5rem;
+    color: var(--primary);
+}
+
+.logo i {
+    font-size: 1.6rem;
+}
+
+.nav-button {
+    background: linear-gradient(135deg, var(--primary) 0%, var(--primary-dark) 100%);
+    color: white;
+    padding: 0.5rem 1.2rem;
+    border-radius: 20px;
+    text-decoration: none;
+    font-weight: 600;
+    font-size: 0.9rem;
+    transition: all 0.3s ease;
+    box-shadow: 0 4px 8px rgba(126, 87, 194, 0.2);
+}
+
+.nav-button:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 6px 12px rgba(126, 87, 194, 0.3);
+}
+
+/* --- Chat Container --- */
+.chat-container {
+    flex-grow: 1;
+    display: flex;
+    flex-direction: column;
+    width: 100%;
+    max-width: 100%;
+    height: calc(100vh - 65px); /* Full screen minus navbar */
+    overflow: hidden;
+    background: transparent;
+    border: none;
+    border-radius: 0;
+    box-shadow: none;
+}
+
+#chat-messages {
+    flex-grow: 1;
+    overflow-y: auto;
+    padding: 2rem;
+    display: flex;
+    flex-direction: column;
+    gap: 1.5rem;
+    width: 100%;
+    max-width: 100%;
+    box-sizing: border-box;
+}
+
+/* Chat Bubbles (Expanded size to show paragraphs/answers clearly) */
+.message {
+    max-width: 95%;
+    padding: 1rem 1.5rem;
+    border-radius: 16px;
+    line-height: 1.7;
+    word-wrap: break-word;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
+    font-size: 1.05rem;
+    animation: popIn 0.3s ease-out;
+}
+
+@keyframes popIn { 
+    from { opacity: 0; transform: translateY(10px); } 
+    to { opacity: 1; transform: translateY(0); } 
+}
+
+.message p:not(:last-child) {
+    margin-bottom: 0.8rem;
+}
+
+.user-message {
+    background: var(--user-msg);
+    color: white;
+    align-self: flex-end;
+    border-bottom-right-radius: 4px;
+}
+
+.bot-message {
+    background: var(--bot-msg);
+    color: var(--text-dark);
+    align-self: flex-start;
+    border-bottom-left-radius: 4px;
+    border: 1px solid rgba(126, 87, 194, 0.1);
+}
+
+/* Chat Input Form */
+#chat-form {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    padding: 1.5rem;
+    background: transparent;
+    width: 100%;
+    max-width: 1200px;
+    margin: 0 auto;
+    box-sizing: border-box;
+}
+
+#user-input {
+    flex-grow: 1;
+    border: 1px solid rgba(126, 87, 194, 0.2);
+    border-radius: 30px;
+    padding: 1rem 1.5rem;
+    font-size: 1rem;
+    font-family: var(--font-family);
+    background-color: var(--card-bg);
+    color: var(--text-dark);
+    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.05);
+    transition: all 0.3s ease;
+}
+
+#user-input:focus {
+    outline: none;
+    border-color: var(--primary);
+    box-shadow: 0 4px 20px rgba(126, 87, 194, 0.15);
+}
+
+#chat-form button {
+    background: linear-gradient(135deg, var(--primary) 0%, var(--primary-dark) 100%);
+    color: white;
+    border: none;
+    width: 52px;
+    height: 52px;
+    border-radius: 50%;
+    cursor: pointer;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    transition: all 0.3s ease;
+    flex-shrink: 0;
+    box-shadow: 0 4px 10px rgba(126, 87, 194, 0.3);
+}
+
+#chat-form button:hover {
+    transform: scale(1.05);
+    box-shadow: 0 6px 15px rgba(126, 87, 194, 0.4);
+}
+
+#chat-form button svg { 
+    width: 24px; 
+    height: 24px; 
+    fill: currentColor;
+}
+
+/* --- Styles for Quiz Page (Light Theme Adaptation) --- */
+.quiz-container {
+    max-width: 800px; 
+    width: 95%; 
+    margin: 2.5rem auto; 
+    padding: 2.5rem;
+    background: var(--card-bg); 
+    border-radius: 16px; 
+    box-shadow: var(--shadow);
+    border: 1px solid rgba(126, 87, 194, 0.15);
+}
+.hidden { display: none !important; }
+
+#quiz-setup h2, #quiz-results h2 { 
+    text-align: center; 
+    margin-bottom: 2rem; 
+    font-weight: 600; 
+    color: var(--primary-dark); 
+}
+.form-group { margin-bottom: 1.5rem; }
+.form-group label { display: block; margin-bottom: 0.5rem; font-weight: 500; color: var(--text-dark); }
+.form-group input {
+    width: 100%; 
+    padding: 0.85rem; 
+    border: 1.5px solid rgba(126, 87, 194, 0.2); 
+    border-radius: 8px; 
+    font-family: var(--font-family); 
+    font-size: 1rem;
+    background-color: var(--card-bg); 
+    color: var(--text-dark);
+    transition: border-color 0.3s ease, box-shadow 0.3s ease;
+}
+.form-group input:focus { 
+    outline: none; 
+    border-color: var(--primary); 
+    box-shadow: 0 0 0 3px rgba(126, 87, 194, 0.15); 
+}
+
+/* General Quiz Buttons */
+.quiz-btn {
+    width: 100%; 
+    padding: 0.85rem; 
+    font-size: 1.1rem; 
+    font-family: var(--font-family);
+    color: white; 
+    border: none; 
+    border-radius: 8px; 
+    cursor: pointer;
+    text-decoration: none; 
+    display: inline-block; 
+    text-align: center;
+    transition: all 0.3s ease;
+}
+.quiz-btn:hover { 
+    transform: translateY(-2px); 
+    box-shadow: 0 4px 10px rgba(126, 87, 194, 0.2); 
+}
+.quiz-btn.primary { 
+    background: linear-gradient(135deg, var(--primary) 0%, var(--primary-dark) 100%); 
+}
+.quiz-btn.success { 
+    background-color: var(--secondary); 
+    color: white; 
+}
+.quiz-btn.danger { 
+    background-color: var(--accent); 
+    width: auto; 
+    padding: 0.5rem 1rem; 
+    font-size: 1rem; 
+}
+.quiz-btn:disabled { 
+    background: #e0e0e0; 
+    color: #9e9e9e; 
+    cursor: not-allowed; 
+    transform: none; 
+    box-shadow: none; 
+}
+
+/* Quiz Taker */
+.quiz-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem; font-size: 1.1rem; }
+#question-text { margin-bottom: 2rem; font-size: 1.4rem; font-weight: 600; line-height: 1.5; color: var(--primary-dark); }
+#options-container { display: flex; flex-direction: column; gap: 0.75rem; }
+
+#next-question-btn {
+    margin-top: 2rem;
+}
+
+.option-btn {
+    padding: 0.85rem; 
+    text-align: left; 
+    background-color: var(--card-bg); 
+    color: var(--text-dark); 
+    border: 1.5px solid rgba(126, 87, 194, 0.2);
+    border-radius: 8px; 
+    cursor: pointer; 
+    font-size: 1rem; 
+    transition: all 0.2s ease;
+}
+.option-btn:not([disabled]):hover { 
+    border-color: var(--primary); 
+    background-color: var(--bot-msg); 
+}
+.option-btn.correct { 
+    border-color: var(--secondary); 
+    background-color: rgba(38, 166, 154, 0.15); 
+    font-weight: bold; 
+}
+.option-btn.incorrect { 
+    border-color: var(--accent); 
+    background-color: rgba(255, 112, 67, 0.15); 
+}
+
+#quiz-results { text-align: center; }
+#final-score { font-size: 1.8rem; font-weight: 600; margin-bottom: 1rem; color: var(--primary); }
+
+/* Loader */
+.loader {
+    border: 4px solid rgba(126, 87, 194, 0.1);
+    width: 36px;
+    height: 36px;
+    border-radius: 50%;
+    border-left-color: var(--primary);
+    animation: spin 1s linear infinite;
+    margin: 1.5rem auto;
+}
+@keyframes spin {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
+}
