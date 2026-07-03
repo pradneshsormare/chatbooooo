@@ -1,8 +1,3 @@
-import { GoogleGenerativeAI } from "https://esm.run/@google/generative-ai";
-
-// ------------------ CONFIGURATION ------------------
-const API_KEY = "AIzaSyATyqoNXa1DCgqQgkKN5Atu8-m4SBwNJKM"; // <-- PASTE YOUR KEY HERE
-
 // ------------------ DOM ELEMENTS ------------------
 const setupForm = document.getElementById('setup-form');
 const quizSetup = document.getElementById('quiz-setup');
@@ -23,10 +18,6 @@ const finalFeedbackEl = document.getElementById('final-feedback');
 let quizQuestions = [];
 let currentQuestionIndex = 0;
 let score = 0;
-
-// ------------------ AI INITIALIZATION ------------------
-const genAI = new GoogleGenerativeAI(API_KEY);
-const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
 
 // ------------------ EVENT LISTENERS ------------------
 setupForm.addEventListener('submit', async (e) => {
@@ -55,17 +46,18 @@ stopQuizBtn.addEventListener('click', () => {
 
 // ------------------ CORE FUNCTIONS ------------------
 async function generateQuiz(topic, numQuestions) {
-    const prompt = `
-        Generate a ${numQuestions}-question multiple-choice quiz on '${topic}'.
-        Provide the output in a valid JSON array format. Each object should have:
-        {"question": "...", "options": ["...", "...", "..."], "answer": "..."}
-        Do not include any text outside of the JSON array.
-    `;
     try {
-        const result = await model.generateContent(prompt);
-        const response = await result.response;
-        const jsonText = response.text().replace(/```json/g, "").replace(/```/g, "").trim();
-        quizQuestions = JSON.parse(jsonText);
+        const response = await fetch("/api/quiz", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ topic, numQuestions }),
+        });
+
+        if (!response.ok) {
+            throw new Error(`Server responded with status ${response.status}`);
+        }
+
+        quizQuestions = await response.json();
         
         currentQuestionIndex = 0;
         score = 0;
@@ -119,6 +111,6 @@ function showResults() {
     finalScoreEl.innerText = `You scored ${score} out of ${quizQuestions.length}.`;
     
     const percentage = (score / quizQuestions.length) * 100;
-    let feedback = percentage > 80 ? "Excellent work!" : percentage > 60 ? "Good job!" : "Keep studying and try again!";
+    let feedback = percentage > 80 ? "Excellent job, future investor!" : percentage > 60 ? "Good job! You're building solid market knowledge." : "Keep learning and try again!";
     finalFeedbackEl.innerText = feedback;
 }

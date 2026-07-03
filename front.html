@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>StudyBot AI - Your Learning Companion</title>
+    <title>TradeBot AI - Your Indian Share Market Guide</title>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <style>
         /* General Styling */
@@ -14,22 +14,23 @@
         }
 
         :root {
-            --primary: #7E57C2;
-            --primary-light: #B39DDB;
-            --primary-dark: #5E35B1;
-            --secondary: #26A69A;
-            --accent: #FF7043;
-            --text-dark: #37474F;
+            --primary: #10B981; /* Emerald Green */
+            --primary-light: #34D399; /* Light Emerald */
+            --primary-dark: #059669; /* Dark Emerald */
+            --secondary: #0EA5E9; /* Sky Blue */
+            --accent: #F43F5E; /* Rose Red */
+            --text-dark: #F1F5F9; /* Off-White for Dark Theme */
             --text-light: #ECEFF1;
-            --bg-light: #F5F7FA;
-            --card-bg: #FFFFFF;
-            --user-msg: #7E57C2;
-            --bot-msg: #E8EAF6;
+            --text-muted: #94A3B8; /* Muted Slate */
+            --bg-dark: #0B0F19; /* Sleek navy dark background */
+            --card-bg: #1E293B; /* Slate grey card background */
+            --user-msg: #059669;
+            --bot-msg: #334155;
         }
 
         body {
             font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-            background: linear-gradient(135deg, #f5f7fa 0%, #e8eaf6 100%);
+            background: linear-gradient(135deg, #0B0F19 0%, #1E293B 100%);
             color: var(--text-dark);
             line-height: 1.6;
         }
@@ -42,8 +43,8 @@
 
         /* Header & Navigation */
         header {
-            background-color: rgba(255, 255, 255, 0.95);
-            box-shadow: 0 2px 15px rgba(0, 0, 0, 0.1);
+            background-color: rgba(15, 23, 42, 0.95);
+            box-shadow: 0 2px 15px rgba(0, 0, 0, 0.3);
             position: sticky;
             top: 0;
             z-index: 100;
@@ -72,18 +73,13 @@
 
         .nav-links a {
             text-decoration: none;
-            color: var(--text-dark);
+            color: var(--text-muted);
             font-weight: 500;
             transition: color 0.3s;
         }
 
         .nav-links a:hover {
             color: var(--primary);
-        }
-
-        .auth-buttons {
-            display: flex;
-            gap: 1rem;
         }
 
         .btn {
@@ -111,17 +107,17 @@
             background: linear-gradient(135deg, var(--primary) 0%, var(--primary-dark) 100%);
             color: white;
             border: none;
-            box-shadow: 0 4px 8px rgba(126, 87, 194, 0.3);
+            box-shadow: 0 4px 8px rgba(16, 185, 129, 0.3);
         }
 
         .btn-primary:hover {
             transform: translateY(-2px);
-            box-shadow: 0 6px 12px rgba(126, 87, 194, 0.4);
+            box-shadow: 0 6px 12px rgba(16, 185, 129, 0.4);
         }
 
         /* Hero Section */
         .hero {
-            padding: 4rem 0;
+            padding: 5rem 0;
             display: flex;
             align-items: center;
             gap: 3rem;
@@ -140,14 +136,18 @@
         .hero h1 {
             font-size: 3rem;
             margin-bottom: 1.5rem;
-            color: var(--primary-dark);
+            color: #FFFFFF;
             line-height: 1.2;
+        }
+
+        .hero h1 span {
+            color: var(--primary);
         }
 
         .hero p {
             font-size: 1.2rem;
             margin-bottom: 2rem;
-            color: var(--text-dark);
+            color: var(--text-muted);
         }
 
         .hero-buttons {
@@ -155,17 +155,10 @@
             gap: 1rem;
         }
 
-        .hero-image img {
-            max-width: 100%;
-            border-radius: 10px;
-            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.15);
-            animation: float 5s ease-in-out infinite;
-        }
-
         /* Features Section */
         .features {
             padding: 5rem 0;
-            background-color: white;
+            background-color: #0F172A;
         }
 
         .section-title {
@@ -181,28 +174,30 @@
 
         .section-title p {
             font-size: 1.2rem;
-            color: var(--text-dark);
+            color: var(--text-muted);
             max-width: 700px;
             margin: 0 auto;
         }
 
         .features-grid {
             display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
             gap: 2rem;
         }
 
         .feature-card {
             background: var(--card-bg);
             border-radius: 12px;
-            padding: 2rem;
-            box-shadow: 0 10px 20px rgba(0, 0, 0, 0.08);
-            transition: transform 0.3s ease;
+            padding: 2.5rem 2rem;
+            box-shadow: 0 10px 20px rgba(0, 0, 0, 0.2);
+            transition: transform 0.3s ease, border-color 0.3s ease;
             text-align: center;
+            border: 1px solid rgba(255, 255, 255, 0.05);
         }
 
         .feature-card:hover {
             transform: translateY(-10px);
+            border-color: var(--primary);
         }
 
         .feature-icon {
@@ -216,18 +211,24 @@
             margin: 0 auto 1.5rem;
             color: white;
             font-size: 1.8rem;
+            box-shadow: 0 4px 10px rgba(16, 185, 129, 0.3);
         }
 
         .feature-card h3 {
-            font-size: 1.5rem;
+            font-size: 1.4rem;
             margin-bottom: 1rem;
-            color: var(--primary-dark);
+            color: #FFFFFF;
+        }
+
+        .feature-card p {
+            color: var(--text-muted);
+            font-size: 0.95rem;
         }
 
         /* Dashboard Preview */
         .dashboard-preview {
             padding: 5rem 0;
-            background: linear-gradient(135deg, #f5f7fa 0%, #e8eaf6 100%);
+            background: linear-gradient(135deg, #0B0F19 0%, #1E293B 100%);
             text-align: center;
         }
 
@@ -236,13 +237,15 @@
             margin: 3rem auto 0;
             border-radius: 12px;
             overflow: hidden;
-            box-shadow: 0 25px 50px rgba(0, 0, 0, 0.2);
+            box-shadow: 0 25px 50px rgba(0, 0, 0, 0.4);
             position: relative;
+            border: 1px solid rgba(255, 255, 255, 0.1);
         }
 
         .dashboard-image img {
             width: 100%;
             display: block;
+            opacity: 0.85;
         }
 
         .overlay-button {
@@ -256,19 +259,21 @@
 
         /* Footer */
         footer {
-            background: var(--primary-dark);
-            color: white;
-            padding: 3rem 0;
+            background: #0B0F19;
+            color: var(--text-muted);
+            padding: 4rem 0 2rem;
+            border-top: 1px solid rgba(255, 255, 255, 0.05);
         }
 
         .footer-content {
             display: grid;
             grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
-            gap: 2rem;
+            gap: 3rem;
         }
 
         .footer-section h3 {
             font-size: 1.3rem;
+            color: #FFFFFF;
             margin-bottom: 1.5rem;
             position: relative;
             padding-bottom: 0.5rem;
@@ -281,7 +286,7 @@
             left: 0;
             width: 50px;
             height: 2px;
-            background: var(--accent);
+            background: var(--primary);
         }
 
         .footer-links {
@@ -293,13 +298,13 @@
         }
 
         .footer-links a {
-            color: var(--text-light);
+            color: var(--text-muted);
             text-decoration: none;
             transition: color 0.3s;
         }
 
         .footer-links a:hover {
-            color: var(--accent);
+            color: var(--primary);
         }
 
         .social-icons {
@@ -309,35 +314,31 @@
         }
 
         .social-icons a {
-            color: white;
+            color: var(--text-muted);
             font-size: 1.2rem;
             transition: color 0.3s;
         }
 
         .social-icons a:hover {
-            color: var(--accent);
+            color: var(--primary);
         }
 
         .footer-bottom {
             text-align: center;
-            margin-top: 3rem;
+            margin-top: 4rem;
             padding-top: 1.5rem;
-            border-top: 1px solid rgba(255, 255, 255, 0.1);
+            border-top: 1px solid rgba(255, 255, 255, 0.05);
+            font-size: 0.85rem;
         }
 
         /* Animations */
-        @keyframes float {
-            0%, 100% { transform: translateY(0); }
-            50% { transform: translateY(-15px); }
-        }
-
         @keyframes fadeIn {
             from { opacity: 0; transform: translateY(20px); }
             to { opacity: 1; transform: translateY(0); }
         }
 
         .animated {
-            animation: fadeIn 1s ease-out;
+            animation: fadeIn 1s ease-out forwards;
         }
 
         /* Responsive Design */
@@ -345,6 +346,7 @@
             .hero {
                 flex-direction: column;
                 text-align: center;
+                padding: 3rem 0;
             }
             
             .hero-buttons {
@@ -379,15 +381,14 @@
         <div class="container">
             <div class="navbar">
                 <div class="logo">
-                    <i class="fas fa-robot"></i>
-                    <span>StudyBot AI</span>
+                    <i class="fas fa-chart-line"></i>
+                    <span>TradeBot AI</span>
                 </div>
                 
                 <div class="nav-links">
                     <a href="#">Home</a>
-                    <a href="#">Features</a>
-                    <a href="#">How It Works</a>
-                    <a href="#">Pricing</a>
+                    <a href="#dashboard">Chat</a>
+                    <a href="quiz.html">Practice Quiz</a>
                 </div>
             </div>
         </div>
@@ -397,14 +398,13 @@
     <section class="hero">
         <div class="container">
             <div class="hero-content animated">
-                <h1>Welcome to StudyBot AI - Your Personal Learning Assistant</h1>
-                <p>An intelligent chatbot designed to help students master difficult concepts, prepare for exams, and improve their understanding across various subjects.</p>
+                <h1>Welcome to <span>TradeBot AI</span> - Your Indian Share Market Guide</h1>
+                <p>An intelligent chatbot designed to help you navigate the stock market, understand SIPs, analyze shares, and learn smart investing strategies.</p>
                 <div class="hero-buttons">
-                    <a href="index.html" class="btn btn-primary">Get Started</a>
-                    
+                    <a href="index.html" class="btn btn-primary">Start Chatting</a>
+                    <a href="quiz.html" class="btn btn-outline">Practice Quiz</a>
                 </div>
             </div>
-            
         </div>
     </section>
 
@@ -412,41 +412,41 @@
     <section class="features">
         <div class="container">
             <div class="section-title">
-                <h2>How StudyBot Can Help You</h2>
-                <p>Our AI-powered assistant provides personalized support across multiple subjects</p>
+                <h2>How TradeBot Can Help You</h2>
+                <p>Our AI-powered assistant provides expert guidance across key financial areas</p>
             </div>
             
             <div class="features-grid">
                 <div class="feature-card">
                     <div class="feature-icon">
-                        <i class="fas fa-calculator"></i>
+                        <i class="fas fa-chart-bar"></i>
                     </div>
-                    <h3>Mathematics</h3>
-                    <p>Get step-by-step solutions to complex problems and understand mathematical concepts</p>
+                    <h3>Stock Analysis</h3>
+                    <p>Understand key fundamental metrics like P/E ratios, market capitalization, balance sheets, and dividend yields.</p>
                 </div>
                 
                 <div class="feature-card">
                     <div class="feature-icon">
-                        <i class="fas fa-flask"></i>
+                        <i class="fas fa-wallet"></i>
                     </div>
-                    <h3>Science</h3>
-                    <p>Explore scientific concepts with detailed explanations and interactive examples</p>
+                    <h3>SIP & Mutual Funds</h3>
+                    <p>Learn how Systematic Investment Plans work, the power of compounding, and the difference between equity, debt, and hybrid funds.</p>
                 </div>
                 
                 <div class="feature-card">
                     <div class="feature-icon">
-                        <i class="fas fa-book"></i>
+                        <i class="fas fa-indian-rupee-sign"></i>
                     </div>
-                    <h3>English</h3>
-                    <p>Improve your writing skills, grammar, and literature analysis with personalized feedback</p>
+                    <h3>Indian Market Insights</h3>
+                    <p>Get updates on Nifty 50, Sensex, NSE/BSE listings, SEBI regulations, and tax-saving investment options like ELSS.</p>
                 </div>
                 
                 <div class="feature-card">
                     <div class="feature-icon">
-                        <i class="fas fa-code"></i>
+                        <i class="fas fa-gears"></i>
                     </div>
-                    <h3>Programming</h3>
-                    <p>Learn to code with explanations, debugging help, and best practices</p>
+                    <h3>Trading Strategies</h3>
+                    <p>Explore trading concepts including intraday trading, swing trading, technical analysis indicators, and risk management.</p>
                 </div>
             </div>
         </div>
@@ -456,13 +456,13 @@
     <section class="dashboard-preview" id="dashboard">
         <div class="container">
             <div class="section-title">
-                <h2>Interactive Learning Dashboard</h2>
-                <p>Experience our intuitive chat interface designed to make learning enjoyable and effective</p>
+                <h2>Interactive Trading & Investment Dashboard</h2>
+                <p>Experience our intuitive chat interface designed to make market research and learning finance enjoyable and effective</p>
             </div>
             
             <div class="dashboard-image">
-                <img src="https://images.unsplash.com/photo-1581291518633-83b4ebd1d83e?ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&auto=format&fit=crop&w=900&q=80" alt="StudyBot Dashboard">
-                <a href="chat-interface.html" class="btn btn-primary overlay-button">Try StudyBot Now</a>
+                <img src="https://images.unsplash.com/photo-1611974789855-9c2a0a7236a3?ixlib=rb-4.0.3&auto=format&fit=crop&w=900&q=80" alt="TradeBot Dashboard">
+                <a href="index.html" class="btn btn-primary overlay-button">Try TradeBot Now</a>
             </div>
         </div>
     </section>
@@ -472,24 +472,24 @@
         <div class="container">
             <div class="footer-content">
                 <div class="footer-section">
-                    <h3>About StudyBot</h3>
-                    <p>StudyBot AI is an intelligent tutoring system designed to help students of all levels achieve academic success through personalized AI assistance.</p>
+                    <h3>About TradeBot</h3>
+                    <p>TradeBot AI is an intelligent financial assistant designed to help investors and traders of all levels understand the Indian share market and achieve investment literacy.</p>
                 </div>
                 
                 <div class="footer-section">
                     <h3>Quick Links</h3>
                     <ul class="footer-links">
                         <li><a href="#">Home</a></li>
-                        <li><a href="#">Features</a></li>
-                        <li><a href="#">Pricing</a></li>
-                        <li><a href="#">Testimonials</a></li>
-                        <li><a href="#">Contact Us</a></li>
+                        <li><a href="#dashboard">Chat</a></li>
+                        <li><a href="quiz.html">Practice Quiz</a></li>
+                        <li><a href="#">Terms & Conditions</a></li>
+                        <li><a href="#">Disclaimer</a></li>
                     </ul>
                 </div>
                 
                 <div class="footer-section">
                     <h3>Connect With Us</h3>
-                    <p>Follow us on social media for updates and learning tips:</p>
+                    <p>Follow us on social media for stock market tips and financial updates:</p>
                     <div class="social-icons">
                         <a href="#"><i class="fab fa-facebook"></i></a>
                         <a href="#"><i class="fab fa-twitter"></i></a>
@@ -500,7 +500,8 @@
             </div>
             
             <div class="footer-bottom">
-                <p>&copy; 2023 StudyBot AI. All rights reserved.</p>
+                <p>&copy; 2026 TradeBot AI. All rights reserved.</p>
+                <p style="font-size: 0.75rem; margin-top: 0.5rem; opacity: 0.6;">Disclaimer: Financial investments are subject to market risks. Please read all related documents carefully before investing.</p>
             </div>
         </div>
     </footer>

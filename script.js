@@ -32,7 +32,12 @@ chatForm.addEventListener("submit", async (e) => {
         // Remove the loading indicator before adding the final message
         loadingIndicator.remove();
         // Use the updated addMessage function for the bot's response
-        addMessage(data.text, "bot");
+        const botMsgEl = addMessage(data.text, "bot");
+
+        // If stockData is returned, draw the stock chart card
+        if (data.stockData) {
+            appendStockCard(data.stockData, botMsgEl);
+        }
     } catch (error) {
         loadingIndicator.remove();
         addMessage("Sorry, something went wrong. Please try again.", "bot");
@@ -89,4 +94,119 @@ function addMessage(text, sender, isLoading = false) {
     chatMessages.appendChild(messageElement);
     chatMessages.scrollTop = chatMessages.scrollHeight;
     return messageElement;
+}
+
+/**
+ * Appends a Chart.js stock chart card below the bot's text message.
+ * @param {Object} stockData The stock metadata and history.
+ * @param {HTMLElement} targetMessageEl The parent bot message element.
+ */
+function appendStockCard(stockData, targetMessageEl) {
+    const card = document.createElement("div");
+    card.classList.add("stock-card");
+
+    const isUp = stockData.change >= 0;
+    const arrowIcon = isUp ? "fa-arrow-trend-up" : "fa-arrow-trend-down";
+    const changeClass = isUp ? "up" : "down";
+    const sign = isUp ? "+" : "";
+
+    // Generate unique ID for chart canvas
+    const chartId = `chart-${Date.now()}-${Math.floor(Math.random() * 1000)}`;
+
+    card.innerHTML = `
+        <div class="stock-card-header">
+            <div class="stock-company">
+                <span class="stock-name">${stockData.companyName}</span>
+                <span class="stock-symbol">${stockData.ticker} · NSE</span>
+            </div>
+            <div class="stock-price-info">
+                <span class="stock-current-price">₹${stockData.currentPrice.toLocaleString("en-IN", { minimumFractionDigits: 2 })}</span>
+                <span class="stock-change ${changeClass}">
+                    <i class="fa-solid ${arrowIcon}"></i>
+                    ${sign}${stockData.change.toFixed(2)} (${sign}${stockData.changePercent.toFixed(2)}%)
+                </span>
+            </div>
+        </div>
+        <div class="stock-chart-container">
+            <canvas id="${chartId}"></canvas>
+        </div>
+    `;
+
+    // Append to message element
+    targetMessageEl.appendChild(card);
+
+    // Render Chart using Chart.js
+    const ctx = document.getElementById(chartId).getContext("2d");
+
+    // Colors
+    const lineColor = isUp ? "#10B981" : "#F43F5E";
+    const gradient = ctx.createLinearGradient(0, 0, 0, 180);
+    if (isUp) {
+        gradient.addColorStop(0, "rgba(16, 185, 129, 0.4)");
+        gradient.addColorStop(1, "rgba(16, 185, 129, 0.0)");
+    } else {
+        gradient.addColorStop(0, "rgba(244, 63, 94, 0.4)");
+        gradient.addColorStop(1, "rgba(244, 63, 94, 0.0)");
+    }
+
+    new Chart(ctx, {
+        type: 'line',
+        data: {
+            labels: stockData.history.labels,
+            datasets: [{
+                data: stockData.history.prices,
+                borderColor: lineColor,
+                borderWidth: 2,
+                pointRadius: 0,
+                pointHoverRadius: 5,
+                pointHoverBackgroundColor: lineColor,
+                backgroundColor: gradient,
+                fill: true,
+                tension: 0.15
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                legend: { display: false },
+                tooltip: {
+                    mode: 'index',
+                    intersect: false,
+                    backgroundColor: '#1E293B',
+                    titleColor: '#94A3B8',
+                    bodyColor: '#FFFFFF',
+                    borderColor: 'rgba(255,255,255,0.1)',
+                    borderWidth: 1,
+                    displayColors: false,
+                    callbacks: {
+                        label: function(context) {
+                            return `₹${context.parsed.y.toFixed(2)}`;
+                        }
+                    }
+                }
+            },
+            scales: {
+                x: {
+                    grid: { display: false },
+                    ticks: {
+                        color: '#94A3B8',
+                        font: { size: 10 },
+                        maxTicksLimit: 6
+                    }
+                },
+                y: {
+                    grid: { color: 'rgba(255,255,255,0.05)' },
+                    ticks: {
+                        color: '#94A3B8',
+                        font: { size: 10 }
+                    }
+                }
+            }
+        }
+    });
+
+    // Auto-scroll chat messages
+    const chatMessages = document.getElementById("chat-messages");
+    chatMessages.scrollTop = chatMessages.scrollHeight;
 }
