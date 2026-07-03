@@ -1,0 +1,116 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>TradeBot Terminal</title>
+    <!-- Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <!-- Font Awesome -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- TradingView Lightweight Charts -->
+    <script src="https://unpkg.com/lightweight-charts@4.1.3/dist/lightweight-charts.standalone.production.js"></script>
+    <!-- Terminal Styles -->
+    <link rel="stylesheet" href="terminal.css">
+</head>
+<body class="terminal-body">
+
+    <!-- ===== NAVBAR ===== -->
+    <nav class="terminal-navbar">
+        <a href="index.html" class="terminal-logo">
+            <i class="fas fa-chart-line"></i>
+            <span>TradeBot Terminal</span>
+        </a>
+        <div class="terminal-nav-links">
+            <a href="index.html" class="terminal-nav-btn"><i class="fas fa-comments"></i> Chat</a>
+            <a href="quiz.html" class="terminal-nav-btn"><i class="fas fa-brain"></i> Quiz</a>
+        </div>
+    </nav>
+
+    <!-- ===== STOCK HEADER BAR ===== -->
+    <div class="terminal-stock-header">
+        <div class="stock-info-left">
+            <div class="stock-ticker-name">
+                <span class="ticker" id="header-ticker">—</span>
+                <span class="exchange" id="header-exchange">Loading...</span>
+            </div>
+            <div class="live-price-box">
+                <span class="price" id="header-price">—</span>
+                <span class="change" id="header-change">—</span>
+            </div>
+        </div>
+        <div style="display: flex; align-items: center; gap: 1rem;">
+            <div class="timeframe-buttons">
+                <button class="tf-btn" data-range="1d" data-interval="5m">1D</button>
+                <button class="tf-btn" data-range="5d" data-interval="15m">5D</button>
+                <button class="tf-btn active" data-range="1mo" data-interval="1d">1M</button>
+                <button class="tf-btn" data-range="3mo" data-interval="1d">3M</button>
+                <button class="tf-btn" data-range="6mo" data-interval="1d">6M</button>
+                <button class="tf-btn" data-range="1y" data-interval="1d">1Y</button>
+                <button class="tf-btn" data-range="3y" data-interval="1d">3Y</button>
+                <button class="tf-btn" data-range="5y" data-interval="1wk">5Y</button>
+                <button class="tf-btn" data-range="max" data-interval="1mo">MAX</button>
+            </div>
+            <button class="tf-btn" id="change-symbol-btn" title="Change Symbol">
+                <i class="fas fa-search"></i> Symbol
+            </button>
+        </div>
+    </div>
+
+    <!-- ===== CHART AREA ===== -->
+    <div class="terminal-chart-wrapper">
+        <div id="candlestick-chart"></div>
+
+        <!-- Loading Overlay -->
+        <div class="terminal-loading" id="chart-loading">
+            <div class="terminal-spinner"></div>
+            <p>Fetching market data...</p>
+        </div>
+
+        <!-- Error Overlay -->
+        <div class="terminal-error hidden" id="chart-error">
+            <i class="fas fa-exclamation-triangle"></i>
+            <p id="error-message">Failed to load data.</p>
+            <button onclick="location.reload()">Retry</button>
+        </div>
+    </div>
+
+    <!-- ===== ANALYSIS PANEL ===== -->
+    <div class="terminal-analysis-panel">
+        <div class="analysis-label">
+            <i class="fas fa-fire"></i>
+            <span>AI ANALYSIS</span>
+        </div>
+        <div class="pattern-tags" id="pattern-tags">
+            <!-- Filled dynamically -->
+        </div>
+        <div class="trend-info" id="trend-info">
+            <!-- Filled dynamically -->
+        </div>
+    </div>
+
+    <!-- ===== SYMBOL SEARCH OVERLAY ===== -->
+    <div class="symbol-search-overlay hidden" id="symbol-search-overlay">
+        <div class="symbol-search-box">
+            <h3><i class="fas fa-search"></i> Search Symbol</h3>
+            <form id="symbol-search-form">
+                <input 
+                    type="text" 
+                    class="symbol-search-input" 
+                    id="symbol-search-input" 
+                    placeholder="AAPL, RELIANCE.NS, TCS.NS..."
+                    autocomplete="off"
+                    autofocus
+                >
+            </form>
+            <p class="symbol-search-hint">
+                US stocks: AAPL, TSLA, MSFT &nbsp;|&nbsp; Indian NSE: RELIANCE.NS, TCS.NS, INFY.NS
+            </p>
+        </div>
+    </div>
+
+    <script src="terminal.js"></script>
+</body>
+</html>

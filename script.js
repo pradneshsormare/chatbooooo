@@ -36,7 +36,7 @@ chatForm.addEventListener("submit", async (e) => {
 
         // If stockData is returned, draw the stock chart card
         if (data.stockData) {
-            appendStockCard(data.stockData, botMsgEl);
+            appendStockCard(data.stockData, botMsgEl, data.terminalTicker);
         }
     } catch (error) {
         loadingIndicator.remove();
@@ -100,8 +100,9 @@ function addMessage(text, sender, isLoading = false) {
  * Appends a Chart.js stock chart card below the bot's text message.
  * @param {Object} stockData The stock metadata and history.
  * @param {HTMLElement} targetMessageEl The parent bot message element.
+ * @param {string|null} terminalTicker Optional ticker for the Open Terminal button.
  */
-function appendStockCard(stockData, targetMessageEl) {
+function appendStockCard(stockData, targetMessageEl, terminalTicker) {
     const card = document.createElement("div");
     card.classList.add("stock-card");
 
@@ -112,6 +113,9 @@ function appendStockCard(stockData, targetMessageEl) {
 
     // Generate unique ID for chart canvas
     const chartId = `chart-${Date.now()}-${Math.floor(Math.random() * 1000)}`;
+
+    // Determine the ticker for the terminal link
+    const termTicker = terminalTicker || stockData.ticker;
 
     card.innerHTML = `
         <div class="stock-card-header">
@@ -130,6 +134,11 @@ function appendStockCard(stockData, targetMessageEl) {
         <div class="stock-chart-container">
             <canvas id="${chartId}"></canvas>
         </div>
+        <a href="terminal.html?symbol=${encodeURIComponent(termTicker)}" target="_blank" class="open-terminal-btn">
+            <i class="fas fa-chart-candlestick"></i>
+            <i class="fas fa-chart-bar"></i>
+            Open Terminal
+        </a>
     `;
 
     // Append to message element

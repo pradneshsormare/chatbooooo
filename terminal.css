@@ -1,0 +1,449 @@
+/* ========== TERMINAL.CSS — Groww-Style Dark Trading Terminal ========== */
+
+:root {
+    --t-bg: #0B0F19;
+    --t-surface: #131B2E;
+    --t-card: #1A2340;
+    --t-border: rgba(16, 185, 129, 0.15);
+    --t-border-bright: rgba(16, 185, 129, 0.35);
+    --t-green: #10B981;
+    --t-green-light: #34D399;
+    --t-green-dim: rgba(16, 185, 129, 0.15);
+    --t-red: #F43F5E;
+    --t-red-dim: rgba(244, 63, 94, 0.15);
+    --t-yellow: #FBBF24;
+    --t-yellow-dim: rgba(251, 191, 36, 0.15);
+    --t-text: #F1F5F9;
+    --t-text-muted: #94A3B8;
+    --t-text-dim: #64748B;
+    --t-font: 'Poppins', 'Segoe UI', sans-serif;
+    --t-font-mono: 'JetBrains Mono', 'Fira Code', 'Consolas', monospace;
+}
+
+* {
+    box-sizing: border-box;
+    margin: 0;
+    padding: 0;
+}
+
+body.terminal-body {
+    font-family: var(--t-font);
+    background: var(--t-bg);
+    color: var(--t-text);
+    height: 100vh;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+}
+
+/* ========== TOP NAVBAR ========== */
+.terminal-navbar {
+    background: rgba(19, 27, 46, 0.92);
+    backdrop-filter: blur(12px);
+    border-bottom: 1px solid var(--t-border);
+    padding: 0.6rem 1.5rem;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    z-index: 100;
+    flex-shrink: 0;
+}
+
+.terminal-logo {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    text-decoration: none;
+}
+
+.terminal-logo i {
+    font-size: 1.4rem;
+    color: var(--t-green);
+}
+
+.terminal-logo span {
+    font-weight: 700;
+    font-size: 1.2rem;
+    color: var(--t-green);
+}
+
+.terminal-nav-links {
+    display: flex;
+    gap: 0.75rem;
+    align-items: center;
+}
+
+.terminal-nav-btn {
+    background: rgba(16, 185, 129, 0.1);
+    color: var(--t-green);
+    padding: 0.4rem 1rem;
+    border-radius: 20px;
+    text-decoration: none;
+    font-weight: 600;
+    font-size: 0.85rem;
+    border: 1px solid var(--t-border);
+    transition: all 0.2s ease;
+}
+
+.terminal-nav-btn:hover {
+    background: rgba(16, 185, 129, 0.2);
+    border-color: var(--t-border-bright);
+}
+
+/* ========== STOCK HEADER BAR ========== */
+.terminal-stock-header {
+    background: var(--t-surface);
+    border-bottom: 1px solid var(--t-border);
+    padding: 0.75rem 1.5rem;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 1rem;
+    flex-shrink: 0;
+}
+
+.stock-info-left {
+    display: flex;
+    align-items: center;
+    gap: 1.25rem;
+}
+
+.stock-ticker-name {
+    display: flex;
+    flex-direction: column;
+}
+
+.stock-ticker-name .ticker {
+    font-size: 1.3rem;
+    font-weight: 700;
+    color: #FFFFFF;
+    letter-spacing: 0.5px;
+}
+
+.stock-ticker-name .exchange {
+    font-size: 0.75rem;
+    color: var(--t-text-muted);
+    text-transform: uppercase;
+    letter-spacing: 1px;
+}
+
+.live-price-box {
+    display: flex;
+    align-items: baseline;
+    gap: 0.75rem;
+}
+
+.live-price-box .price {
+    font-size: 1.5rem;
+    font-weight: 700;
+    font-family: var(--t-font-mono);
+    color: #FFFFFF;
+}
+
+.live-price-box .change {
+    font-size: 0.95rem;
+    font-weight: 600;
+    font-family: var(--t-font-mono);
+}
+
+.live-price-box .change.up {
+    color: var(--t-green);
+}
+
+.live-price-box .change.down {
+    color: var(--t-red);
+}
+
+/* Timeframe buttons */
+.timeframe-buttons {
+    display: flex;
+    gap: 0.35rem;
+}
+
+.tf-btn {
+    background: transparent;
+    color: var(--t-text-muted);
+    border: 1px solid transparent;
+    padding: 0.35rem 0.8rem;
+    border-radius: 6px;
+    font-size: 0.8rem;
+    font-weight: 600;
+    font-family: var(--t-font-mono);
+    cursor: pointer;
+    transition: all 0.15s ease;
+}
+
+.tf-btn:hover {
+    background: rgba(255, 255, 255, 0.05);
+    color: var(--t-text);
+}
+
+.tf-btn.active {
+    background: var(--t-green-dim);
+    color: var(--t-green);
+    border-color: var(--t-border-bright);
+}
+
+/* ========== CHART AREA ========== */
+.terminal-chart-wrapper {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    position: relative;
+}
+
+#candlestick-chart {
+    flex: 1;
+    width: 100%;
+    min-height: 0;
+}
+
+/* ========== ANALYSIS PANEL ========== */
+.terminal-analysis-panel {
+    background: var(--t-surface);
+    border-top: 1px solid var(--t-border);
+    padding: 0.75rem 1.5rem;
+    display: flex;
+    align-items: center;
+    gap: 1.5rem;
+    flex-shrink: 0;
+    overflow-x: auto;
+}
+
+.analysis-label {
+    font-size: 0.75rem;
+    font-weight: 700;
+    color: var(--t-green);
+    text-transform: uppercase;
+    letter-spacing: 1.5px;
+    white-space: nowrap;
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+}
+
+.analysis-label i {
+    font-size: 0.85rem;
+}
+
+.pattern-tags {
+    display: flex;
+    gap: 0.5rem;
+    flex-wrap: wrap;
+}
+
+.pattern-tag {
+    padding: 0.3rem 0.7rem;
+    border-radius: 20px;
+    font-size: 0.78rem;
+    font-weight: 600;
+    white-space: nowrap;
+    display: flex;
+    align-items: center;
+    gap: 0.3rem;
+}
+
+.pattern-tag.bullish {
+    background: var(--t-green-dim);
+    color: var(--t-green-light);
+    border: 1px solid rgba(16, 185, 129, 0.3);
+}
+
+.pattern-tag.bearish {
+    background: var(--t-red-dim);
+    color: var(--t-red);
+    border: 1px solid rgba(244, 63, 94, 0.3);
+}
+
+.pattern-tag.neutral {
+    background: var(--t-yellow-dim);
+    color: var(--t-yellow);
+    border: 1px solid rgba(251, 191, 36, 0.3);
+}
+
+.trend-info {
+    margin-left: auto;
+    font-size: 0.85rem;
+    font-family: var(--t-font-mono);
+    white-space: nowrap;
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+}
+
+.trend-info.up {
+    color: var(--t-green);
+}
+
+.trend-info.down {
+    color: var(--t-red);
+}
+
+.trend-info i {
+    font-size: 0.75rem;
+}
+
+/* ========== LOADING STATE ========== */
+.terminal-loading {
+    position: absolute;
+    inset: 0;
+    background: rgba(11, 15, 25, 0.85);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    z-index: 50;
+    gap: 1rem;
+}
+
+.terminal-loading.hidden {
+    display: none;
+}
+
+.terminal-spinner {
+    width: 40px;
+    height: 40px;
+    border: 3px solid var(--t-border);
+    border-top-color: var(--t-green);
+    border-radius: 50%;
+    animation: t-spin 0.8s linear infinite;
+}
+
+@keyframes t-spin {
+    to { transform: rotate(360deg); }
+}
+
+.terminal-loading p {
+    color: var(--t-text-muted);
+    font-size: 0.9rem;
+}
+
+/* ========== ERROR STATE ========== */
+.terminal-error {
+    position: absolute;
+    inset: 0;
+    background: rgba(11, 15, 25, 0.9);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    z-index: 50;
+    gap: 0.75rem;
+}
+
+.terminal-error.hidden {
+    display: none;
+}
+
+.terminal-error i {
+    font-size: 2rem;
+    color: var(--t-red);
+}
+
+.terminal-error p {
+    color: var(--t-text-muted);
+    font-size: 0.95rem;
+    text-align: center;
+    max-width: 400px;
+}
+
+.terminal-error button {
+    background: var(--t-green-dim);
+    color: var(--t-green);
+    border: 1px solid var(--t-border-bright);
+    padding: 0.5rem 1.5rem;
+    border-radius: 8px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.terminal-error button:hover {
+    background: rgba(16, 185, 129, 0.25);
+}
+
+/* ========== SYMBOL SEARCH OVERLAY ========== */
+.symbol-search-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.6);
+    backdrop-filter: blur(4px);
+    z-index: 200;
+    display: flex;
+    align-items: flex-start;
+    justify-content: center;
+    padding-top: 15vh;
+}
+
+.symbol-search-overlay.hidden {
+    display: none;
+}
+
+.symbol-search-box {
+    background: var(--t-card);
+    border: 1px solid var(--t-border-bright);
+    border-radius: 12px;
+    padding: 1.5rem;
+    width: 90%;
+    max-width: 420px;
+    box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5);
+}
+
+.symbol-search-box h3 {
+    color: var(--t-green);
+    margin-bottom: 1rem;
+    font-size: 1rem;
+}
+
+.symbol-search-input {
+    width: 100%;
+    background: var(--t-surface);
+    border: 1px solid var(--t-border);
+    border-radius: 8px;
+    padding: 0.75rem 1rem;
+    color: var(--t-text);
+    font-size: 1rem;
+    font-family: var(--t-font-mono);
+    outline: none;
+    transition: border-color 0.2s;
+}
+
+.symbol-search-input:focus {
+    border-color: var(--t-green);
+}
+
+.symbol-search-input::placeholder {
+    color: var(--t-text-dim);
+}
+
+.symbol-search-hint {
+    color: var(--t-text-dim);
+    font-size: 0.75rem;
+    margin-top: 0.5rem;
+}
+
+/* ========== RESPONSIVE ========== */
+@media (max-width: 768px) {
+    .terminal-stock-header {
+        padding: 0.5rem 1rem;
+    }
+
+    .stock-ticker-name .ticker {
+        font-size: 1.1rem;
+    }
+
+    .live-price-box .price {
+        font-size: 1.2rem;
+    }
+
+    .terminal-analysis-panel {
+        padding: 0.6rem 1rem;
+        gap: 0.75rem;
+    }
+
+    .trend-info {
+        margin-left: 0;
+    }
+}
