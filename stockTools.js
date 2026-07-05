@@ -249,6 +249,621 @@ function detectThreeBlackCrows(c, prev, prev2) {
   );
 }
 
+// ---------- NEW PATTERN DETECTORS: Marubozu & Spinning Top ----------
+
+function detectBullishMarubozu(c) {
+  // Strong bullish candle: large body, very small or no shadows
+  return (
+    isBullish(c) &&
+    body(c) / range(c) > 0.85 &&
+    upperShadow(c) / range(c) < 0.05 &&
+    lowerShadow(c) / range(c) < 0.05
+  );
+}
+
+function detectBearishMarubozu(c) {
+  return (
+    isBearish(c) &&
+    body(c) / range(c) > 0.85 &&
+    upperShadow(c) / range(c) < 0.05 &&
+    lowerShadow(c) / range(c) < 0.05
+  );
+}
+
+function detectSpinningTop(c) {
+  // Small body with long shadows on both sides
+  const b = body(c);
+  const r = range(c);
+  return (
+    b / r < 0.3 &&
+    b / r > 0.02 && // not a doji
+    upperShadow(c) > b &&
+    lowerShadow(c) > b
+  );
+}
+
+// =====================================================================
+// COMPREHENSIVE ANALYSIS FUNCTIONS
+// =====================================================================
+
+/**
+ * Detect trend direction, strength, higher-highs/lows, and reversal signals.
+ * Returns structured data with chart positions.
+ */
+export function detectTrend(candles) {
+  if (!candles || candles.length < 3) {
+    return { direction: "neutral", strength: 0, confidence: 0, details: [] };
+  }
+
+  const first = candles[0];
+  const last = candles[candles.length - 1];
+  const changePct = ((last.close - first.close) / first.close) * 100;
+
+  // Find swing highs and swing lows (local peaks and troughs)
+  const swingHighs = [];
+  const swingLows = [];
+  for (let i = 2; i < candles.length - 2; i++) {
+    const c = candles[i];
+    if (c.high > candles[i-1].high && c.high > candles[i-2].high &&
+        c.high > candles[i+1].high && c.high > candles[i+2].high) {
+      swingHighs.push({ index: i, price: c.high, time: c.date });
+    }
+    if (c.low < candles[i-1].low && c.low < candles[i-2].low &&
+        c.low < candles[i+1].low && c.low < candles[i+2].low) {
+      swingLows.push({ index: i, price: c.low, time: c.date });
+    }
+  }
+
+  // Detect higher-highs, higher-lows, lower-highs, lower-lows
+  let higherHighs = 0, lowerHighs = 0;
+  for (let i = 1; i < swingHighs.length; i++) {
+    if (swingHighs[i].price > swingHighs[i-1].price) higherHighs++;
+    else lowerHighs++;
+  }
+  let higherLows = 0, lowerLows = 0;
+  for (let i = 1; i < swingLows.length; i++) {
+    if (swingLows[i].price > swingLows[i-1].price) higherLows++;
+    else lowerLows++;
+  }
+
+  // Trend direction scoring
+  let bullScore = higherHighs + higherLows;
+  let bearScore = lowerHighs + lowerLows;
+  let totalSwings = bullScore + bearScore;
+
+  let direction = "sideways";
+  let confidence = 0;
+  if (totalSwings > 0) {
+    if (bullScore > bearScore) {
+      direction = "bullish";
+      confidence = Math.round((bullScore / totalSwings) * 100);
+    } else if (bearScore > bullScore) {
+      direction = "bearish";
+      confidence = Math.round((bearScore / totalSwings) * 100);
+    } else {
+      direction = "sideways";
+      confidence = 50;
+    }
+  } else {
+    // Fallback: use simple price change
+    if (changePct > 2) { direction = "bullish"; confidence = 60; }
+    else if (changePct < -2) { direction = "bearish"; confidence = 60; }
+    else { direction = "sideways"; confidence = 50; }
+  }
+
+  // Trend strength (0-100) based on consistency and magnitude
+  const avgBody = candles.reduce((sum, c) => sum + body(c), 0) / candles.length;
+  const avgRange = candles.reduce((sum, c) => sum + range(c), 0) / candles.length;
+  const bodyRatio = avgRange > 0 ? (avgBody / avgRange) : 0;
+  const strength = Math.min(100, Math.round(
+    Math.abs(changePct) * 3 + bodyRatio * 30 + confidence * 0.4
+  ));
+
+  // Detect trend weakening: last few candles opposing the main trend
+  const recentSlice = candles.slice(-Math.min(5, Math.floor(candles.length / 3)));
+  const recentChange = recentSlice.length > 1
+    ? ((recentSlice[recentSlice.length-1].close - recentSlice[0].close) / recentSlice[0].close) * 100
+    : 0;
+  const weakening = (direction === "bullish" && recentChange < -1) ||
+                    (direction === "bearish" && recentChange > 1);
+
+  // Possible reversal detection
+  const possibleReversal = weakening && Math.abs(recentChange) > 2;
+
+  // Build details for notes
+  const details = [];
+  if (direction === "bullish") {
+    details.push({ time: first.date, text: `Bullish trend started`, category: "trend" });
+    if (higherHighs > 0) details.push({ time: swingHighs[swingHighs.length-1]?.time || last.date, text: `${higherHighs} higher high(s) detected`, category: "trend" });
+    if (higherLows > 0) details.push({ time: swingLows[swingLows.length-1]?.time || last.date, text: `${higherLows} higher low(s) detected`, category: "trend" });
+  } else if (direction === "bearish") {
+    details.push({ time: first.date, text: `Bearish trend started`, category: "trend" });
+    if (lowerHighs > 0) details.push({ time: swingHighs[swingHighs.length-1]?.time || last.date, text: `${lowerHighs} lower high(s) detected`, category: "trend" });
+    if (lowerLows > 0) details.push({ time: swingLows[swingLows.length-1]?.time || last.date, text: `${lowerLows} lower low(s) detected`, category: "trend" });
+  }
+  if (weakening) {
+    details.push({ time: recentSlice[0].date, text: `Trend weakening detected`, category: "warning" });
+  }
+  if (possibleReversal) {
+    details.push({ time: last.date, text: `Possible trend reversal`, category: "warning" });
+  }
+
+  return {
+    direction,
+    strength,
+    confidence,
+    changePct: Number(changePct.toFixed(2)),
+    startTime: first.date,
+    endTime: last.date,
+    startPrice: first.close,
+    endPrice: last.close,
+    higherHighs,
+    higherLows,
+    lowerHighs,
+    lowerLows,
+    weakening,
+    possibleReversal,
+    swingHighs,
+    swingLows,
+    details
+  };
+}
+
+/**
+ * Detect support and resistance levels by clustering swing points.
+ */
+export function detectSupportResistance(candles) {
+  if (!candles || candles.length < 5) {
+    return { supports: [], resistances: [] };
+  }
+
+  // Find all swing highs and lows (local peaks/troughs with window of 2)
+  const swingPoints = [];
+  for (let i = 2; i < candles.length - 2; i++) {
+    const c = candles[i];
+    const isHigh = c.high >= candles[i-1].high && c.high >= candles[i-2].high &&
+                   c.high >= candles[i+1].high && c.high >= candles[i+2].high;
+    const isLow = c.low <= candles[i-1].low && c.low <= candles[i-2].low &&
+                  c.low <= candles[i+1].low && c.low <= candles[i+2].low;
+    if (isHigh) swingPoints.push({ type: "high", price: c.high, time: c.date, index: i });
+    if (isLow) swingPoints.push({ type: "low", price: c.low, time: c.date, index: i });
+  }
+
+  // Cluster nearby price levels (within 0.5% of each other)
+  const priceRange = Math.max(...candles.map(c => c.high)) - Math.min(...candles.map(c => c.low));
+  const clusterThreshold = priceRange * 0.015; // 1.5% of price range
+
+  const clusters = [];
+  const used = new Set();
+  for (let i = 0; i < swingPoints.length; i++) {
+    if (used.has(i)) continue;
+    const cluster = [swingPoints[i]];
+    used.add(i);
+    for (let j = i + 1; j < swingPoints.length; j++) {
+      if (used.has(j)) continue;
+      if (Math.abs(swingPoints[j].price - swingPoints[i].price) <= clusterThreshold) {
+        cluster.push(swingPoints[j]);
+        used.add(j);
+      }
+    }
+    if (cluster.length >= 1) {
+      const avgPrice = cluster.reduce((s, p) => s + p.price, 0) / cluster.length;
+      const types = cluster.map(p => p.type);
+      clusters.push({
+        price: Number(avgPrice.toFixed(2)),
+        touches: cluster.length,
+        points: cluster,
+        isResistance: types.filter(t => t === "high").length >= types.filter(t => t === "low").length,
+        strength: Math.min(100, cluster.length * 25)
+      });
+    }
+  }
+
+  // Sort by strength (more touches = stronger)
+  clusters.sort((a, b) => b.touches - a.touches);
+
+  // Current price for classifying support vs resistance
+  const currentPrice = candles[candles.length - 1].close;
+
+  const supports = clusters
+    .filter(c => c.price < currentPrice)
+    .slice(0, 5)
+    .map(c => ({
+      price: c.price,
+      strength: c.strength,
+      touches: c.touches,
+      times: c.points.map(p => p.time)
+    }));
+
+  const resistances = clusters
+    .filter(c => c.price >= currentPrice)
+    .slice(0, 5)
+    .map(c => ({
+      price: c.price,
+      strength: c.strength,
+      touches: c.touches,
+      times: c.points.map(p => p.time)
+    }));
+
+  // Build notes
+  const details = [];
+  supports.forEach(s => {
+    details.push({
+      time: s.times[s.times.length - 1],
+      text: `Support at ${s.price} (${s.touches} touch${s.touches > 1 ? 'es' : ''})`,
+      category: "support"
+    });
+  });
+  resistances.forEach(r => {
+    details.push({
+      time: r.times[r.times.length - 1],
+      text: `Resistance at ${r.price} (${r.touches} touch${r.touches > 1 ? 'es' : ''})`,
+      category: "resistance"
+    });
+  });
+
+  return { supports, resistances, details };
+}
+
+/**
+ * Calculate momentum using RSI and rate of change.
+ */
+export function calculateMomentum(candles) {
+  if (!candles || candles.length < 15) {
+    return { rsi: 50, roc: 0, direction: "neutral", strength: "moderate", details: [] };
+  }
+
+  // RSI (14-period)
+  const period = 14;
+  let gains = 0, losses = 0;
+  const startIdx = candles.length - period - 1;
+  for (let i = startIdx + 1; i <= startIdx + period; i++) {
+    const change = candles[i].close - candles[i-1].close;
+    if (change > 0) gains += change;
+    else losses += Math.abs(change);
+  }
+  let avgGain = gains / period;
+  let avgLoss = losses / period;
+
+  // Smooth RSI for remaining candles
+  for (let i = startIdx + period + 1; i < candles.length; i++) {
+    const change = candles[i].close - candles[i-1].close;
+    avgGain = (avgGain * (period - 1) + (change > 0 ? change : 0)) / period;
+    avgLoss = (avgLoss * (period - 1) + (change < 0 ? Math.abs(change) : 0)) / period;
+  }
+
+  const rs = avgLoss === 0 ? 100 : avgGain / avgLoss;
+  const rsi = Number((100 - 100 / (1 + rs)).toFixed(2));
+
+  // Rate of Change (10-period)
+  const rocPeriod = Math.min(10, candles.length - 1);
+  const rocBase = candles[candles.length - 1 - rocPeriod].close;
+  const roc = Number((((candles[candles.length - 1].close - rocBase) / rocBase) * 100).toFixed(2));
+
+  // Direction and strength
+  let direction = "neutral";
+  let momentumStrength = "moderate";
+  if (rsi > 70) { direction = "overbought"; momentumStrength = "strong bullish"; }
+  else if (rsi > 55) { direction = "bullish"; momentumStrength = "moderate bullish"; }
+  else if (rsi < 30) { direction = "oversold"; momentumStrength = "strong bearish"; }
+  else if (rsi < 45) { direction = "bearish"; momentumStrength = "moderate bearish"; }
+
+  const details = [];
+  details.push({
+    time: candles[candles.length - 1].date,
+    text: `RSI: ${rsi} — ${direction}${rsi > 70 ? ' (overbought zone)' : rsi < 30 ? ' (oversold zone)' : ''}`,
+    category: "momentum"
+  });
+  if (Math.abs(roc) > 3) {
+    details.push({
+      time: candles[candles.length - 1].date,
+      text: `Rate of Change: ${roc > 0 ? '+' : ''}${roc}% — ${roc > 0 ? 'strong upward' : 'strong downward'} momentum`,
+      category: "momentum"
+    });
+  }
+
+  return { rsi, roc, direction, strength: momentumStrength, details };
+}
+
+/**
+ * Analyze volume trends, average volume, and breakout detection.
+ */
+export function analyzeVolume(candles) {
+  if (!candles || candles.length < 5) {
+    return { avgVolume: 0, trend: "flat", breakouts: [], details: [] };
+  }
+
+  const volumes = candles.map(c => c.volume || 0);
+  const avgVolume = Math.round(volumes.reduce((s, v) => s + v, 0) / volumes.length);
+
+  // Volume trend: compare first half vs second half
+  const mid = Math.floor(candles.length / 2);
+  const firstHalfAvg = volumes.slice(0, mid).reduce((s, v) => s + v, 0) / mid;
+  const secondHalfAvg = volumes.slice(mid).reduce((s, v) => s + v, 0) / (candles.length - mid);
+  const volumeChangePct = firstHalfAvg > 0 ? ((secondHalfAvg - firstHalfAvg) / firstHalfAvg) * 100 : 0;
+
+  let trend = "flat";
+  if (volumeChangePct > 20) trend = "increasing";
+  else if (volumeChangePct < -20) trend = "decreasing";
+
+  // Detect volume breakouts (> 2x average)
+  const breakouts = [];
+  candles.forEach((c, i) => {
+    if (c.volume && c.volume > avgVolume * 2) {
+      const priceDir = c.close >= c.open ? "bullish" : "bearish";
+      breakouts.push({
+        time: c.date,
+        volume: c.volume,
+        ratio: Number((c.volume / avgVolume).toFixed(1)),
+        priceDirection: priceDir
+      });
+    }
+  });
+
+  // Volume-price confirmation
+  const recent = candles.slice(-5);
+  const recentPriceUp = recent[recent.length-1].close > recent[0].close;
+  const recentVolUp = (recent.map(c => c.volume || 0).reduce((s,v) => s+v, 0) / recent.length) > avgVolume;
+  const confirmation = (recentPriceUp && recentVolUp) || (!recentPriceUp && !recentVolUp);
+
+  const details = [];
+  if (trend !== "flat") {
+    details.push({
+      time: candles[mid].date,
+      text: `Volume ${trend} (${volumeChangePct > 0 ? '+' : ''}${volumeChangePct.toFixed(0)}% change)`,
+      category: "volume"
+    });
+  }
+  breakouts.forEach(b => {
+    details.push({
+      time: b.time,
+      text: `Volume breakout: ${b.ratio}x average (${b.priceDirection})`,
+      category: "volume"
+    });
+  });
+  if (!confirmation) {
+    details.push({
+      time: candles[candles.length - 1].date,
+      text: `Volume-price divergence detected`,
+      category: "warning"
+    });
+  }
+
+  return {
+    avgVolume,
+    trend,
+    volumeChangePct: Number(volumeChangePct.toFixed(2)),
+    breakouts,
+    confirmation,
+    details
+  };
+}
+
+/**
+ * Scan ALL candles for patterns (enhanced with Marubozu and Spinning Top).
+ */
+export function detectAllPatternsEnhanced(candles) {
+  if (candles.length < 3) return candles;
+
+  const annotated = candles.map((c, i) => {
+    const result = { ...c };
+
+    // Need at least 1 previous candle
+    if (i >= 1) {
+      const prev = candles[i - 1];
+
+      // Single-candle patterns (in priority order)
+      if (detectBullishMarubozu(c)) {
+        result.pattern = "Bullish Marubozu";
+        result.signal = "bullish";
+        result.confidence = 85;
+        result.explanation = "Strong bullish candle with no shadows — buyers dominated the entire session.";
+      } else if (detectBearishMarubozu(c)) {
+        result.pattern = "Bearish Marubozu";
+        result.signal = "bearish";
+        result.confidence = 85;
+        result.explanation = "Strong bearish candle with no shadows — sellers dominated the entire session.";
+      } else if (detectDoji(c)) {
+        result.pattern = "Doji";
+        result.signal = "neutral";
+        result.confidence = 60;
+        result.explanation = "Open and close nearly equal — indecision between buyers and sellers.";
+      } else if (detectHammer(c)) {
+        result.pattern = "Hammer";
+        result.signal = "bullish";
+        result.confidence = 72;
+        result.explanation = "Long lower wick with small body at the top — possible bullish reversal signal.";
+      } else if (detectShootingStar(c, prev)) {
+        result.pattern = "Shooting Star";
+        result.signal = "bearish";
+        result.confidence = 70;
+        result.explanation = "Long upper wick after uptrend — sellers pushed price back down, possible reversal.";
+      } else if (detectInvertedHammer(c)) {
+        result.pattern = "Inverted Hammer";
+        result.signal = "bullish";
+        result.confidence = 65;
+        result.explanation = "Long upper wick with small body at bottom — potential bullish reversal signal.";
+      } else if (detectSpinningTop(c)) {
+        result.pattern = "Spinning Top";
+        result.signal = "neutral";
+        result.confidence = 55;
+        result.explanation = "Small body with long shadows — indecision, potential trend pause.";
+      }
+
+      // 2-candle patterns (only if no single-candle pattern found)
+      if (!result.pattern) {
+        if (detectBullishEngulfing(c, prev)) {
+          result.pattern = "Bullish Engulfing";
+          result.signal = "bullish";
+          result.confidence = 78;
+          result.explanation = "Bullish candle fully engulfs prior bearish candle — strong reversal signal.";
+        } else if (detectBearishEngulfing(c, prev)) {
+          result.pattern = "Bearish Engulfing";
+          result.signal = "bearish";
+          result.confidence = 78;
+          result.explanation = "Bearish candle fully engulfs prior bullish candle — strong reversal signal.";
+        }
+      }
+    }
+
+    // 3-candle patterns
+    if (i >= 2 && !result.pattern) {
+      const prev = candles[i - 1];
+      const prev2 = candles[i - 2];
+
+      if (detectMorningStar(c, prev, prev2)) {
+        result.pattern = "Morning Star";
+        result.signal = "bullish";
+        result.confidence = 82;
+        result.explanation = "Three-candle bullish reversal: bearish → small body → bullish close above midpoint.";
+      } else if (detectEveningStar(c, prev, prev2)) {
+        result.pattern = "Evening Star";
+        result.signal = "bearish";
+        result.confidence = 82;
+        result.explanation = "Three-candle bearish reversal: bullish → small body → bearish close below midpoint.";
+      } else if (detectThreeWhiteSoldiers(c, prev, prev2)) {
+        result.pattern = "Three White Soldiers";
+        result.signal = "bullish";
+        result.confidence = 88;
+        result.explanation = "Three consecutive bullish candles with progressively higher closes — strong uptrend continuation.";
+      } else if (detectThreeBlackCrows(c, prev, prev2)) {
+        result.pattern = "Three Black Crows";
+        result.signal = "bearish";
+        result.confidence = 88;
+        result.explanation = "Three consecutive bearish candles with progressively lower closes — strong downtrend continuation.";
+      }
+    }
+
+    return result;
+  });
+
+  return annotated;
+}
+
+/**
+ * Central analysis function: runs ALL analysis on a set of candles.
+ * Returns unified result with chart action data.
+ */
+export function analyzeSelectedRange(candles) {
+  if (!candles || candles.length < 3) {
+    return {
+      trend: { direction: "neutral", strength: 0, confidence: 0 },
+      supportResistance: { supports: [], resistances: [] },
+      patterns: [],
+      momentum: { rsi: 50, direction: "neutral" },
+      volume: { trend: "flat" },
+      notes: [],
+      chartActions: []
+    };
+  }
+
+  const trend = detectTrend(candles);
+  const sr = detectSupportResistance(candles);
+  const annotated = detectAllPatternsEnhanced(candles);
+  const patterns = annotated.filter(c => c.pattern && c.pattern !== "No standard pattern detected");
+  const momentum = calculateMomentum(candles);
+  const vol = analyzeVolume(candles);
+
+  // Build chart actions
+  const chartActions = [];
+  const first = candles[0];
+  const last = candles[candles.length - 1];
+
+  // Highlight the analyzed range
+  chartActions.push({
+    type: "HIGHLIGHT_RANGE",
+    startTime: first.date,
+    endTime: last.date
+  });
+
+  // Trend line
+  if (trend.direction !== "sideways") {
+    chartActions.push({
+      type: "DRAW_TREND_LINE",
+      startTime: trend.startTime,
+      endTime: trend.endTime,
+      startPrice: trend.startPrice,
+      endPrice: trend.endPrice,
+      direction: trend.direction,
+      confidence: trend.confidence,
+      strength: trend.strength
+    });
+  }
+
+  // Support lines
+  sr.supports.forEach(s => {
+    chartActions.push({
+      type: "DRAW_SUPPORT",
+      price: s.price,
+      strength: s.strength,
+      touches: s.touches
+    });
+  });
+
+  // Resistance lines
+  sr.resistances.forEach(r => {
+    chartActions.push({
+      type: "DRAW_RESISTANCE",
+      price: r.price,
+      strength: r.strength,
+      touches: r.touches
+    });
+  });
+
+  // Pattern markers
+  patterns.forEach(p => {
+    chartActions.push({
+      type: "ADD_PATTERN_MARKER",
+      pattern: p.pattern,
+      time: p.date,
+      price: p.signal === "bullish" ? p.low : p.high,
+      direction: p.signal,
+      confidence: p.confidence || 70,
+      explanation: p.explanation || ""
+    });
+  });
+
+  // Collect all notes
+  const notes = [
+    ...trend.details,
+    ...sr.details,
+    ...momentum.details,
+    ...vol.details
+  ];
+
+  // Add pattern notes
+  patterns.forEach(p => {
+    notes.push({
+      time: p.date,
+      text: `${p.pattern} detected (${p.signal}, ${p.confidence || 70}% confidence)`,
+      category: "pattern"
+    });
+  });
+
+  // Sort notes by time
+  notes.sort((a, b) => {
+    if (typeof a.time === 'number' && typeof b.time === 'number') return a.time - b.time;
+    return String(a.time).localeCompare(String(b.time));
+  });
+
+  return {
+    trend,
+    supportResistance: sr,
+    patterns: patterns.map(p => ({
+      pattern: p.pattern,
+      signal: p.signal,
+      confidence: p.confidence,
+      explanation: p.explanation,
+      time: p.date,
+      price: p.close
+    })),
+    momentum,
+    volume: vol,
+    notes,
+    chartActions
+  };
+}
+
 /**
  * Runs all pattern detectors against the most recent candles.
  * Returns an array of matches with a bullish/bearish/neutral signal label.
@@ -282,12 +897,19 @@ export function detectPatterns(candles) {
     matches.push({ pattern: "Three White Soldiers", signal: "bullish" });
   if (detectThreeBlackCrows(c, prev, prev2))
     matches.push({ pattern: "Three Black Crows", signal: "bearish" });
+  // New patterns
+  if (detectBullishMarubozu(c))
+    matches.push({ pattern: "Bullish Marubozu", signal: "bullish" });
+  if (detectBearishMarubozu(c))
+    matches.push({ pattern: "Bearish Marubozu", signal: "bearish" });
+  if (detectSpinningTop(c))
+    matches.push({ pattern: "Spinning Top", signal: "neutral" });
 
   if (matches.length === 0) {
     matches.push({ pattern: "No standard pattern detected", signal: "neutral" });
   }
 
-  // simple trend context over the visible window, for extra judgment material
+  // simple trend context over the visible window
   const first = candles[0];
   const last = candles[candles.length - 1];
   const trendPct = (((last.close - first.close) / first.close) * 100).toFixed(2);
@@ -385,7 +1007,7 @@ export function detectAllPatterns(candles) {
 
 export async function getCandleDataForChart(symbol, range = "3mo", interval = "1d") {
   const candles = await fetchCandles(symbol, range, interval);
-  const annotated = detectAllPatterns(candles);
+  const annotated = detectAllPatternsEnhanced(candles);
 
   // Also compute overall trend
   const first = candles[0];
@@ -401,7 +1023,12 @@ export async function getCandleDataForChart(symbol, range = "3mo", interval = "1
       low: c.low,
       close: c.close,
       volume: c.volume,
-      ...(c.pattern ? { pattern: c.pattern, signal: c.signal } : {})
+      ...(c.pattern ? {
+        pattern: c.pattern,
+        signal: c.signal,
+        confidence: c.confidence || null,
+        explanation: c.explanation || null
+      } : {})
     })),
     trend: {
       direction: trendPct > 0 ? "up" : trendPct < 0 ? "down" : "flat",
@@ -409,3 +1036,4 @@ export async function getCandleDataForChart(symbol, range = "3mo", interval = "1
     }
   };
 }
+

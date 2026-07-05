@@ -9,11 +9,9 @@ chatForm.addEventListener("submit", async (e) => {
     const userProblem = userInput.value.trim();
     if (!userProblem) return;
 
-    // Use the updated addMessage function for the user's message
     addMessage(userProblem, "user");
     userInput.value = "";
 
-    // Add a loading indicator
     const loadingIndicator = addMessage("Thinking...", "bot", true);
 
     try {
@@ -29,14 +27,33 @@ chatForm.addEventListener("submit", async (e) => {
 
         const data = await response.json();
 
-        // Remove the loading indicator before adding the final message
         loadingIndicator.remove();
-        // Use the updated addMessage function for the bot's response
         const botMsgEl = addMessage(data.text, "bot");
 
         // If stockData is returned, draw the stock chart card
         if (data.stockData) {
             appendStockCard(data.stockData, botMsgEl, data.terminalTicker);
+        }
+
+        // If terminal data with chart actions is available, show analysis preview
+        if (data.terminalData) {
+            appendAnalysisPreview(data.terminalData, botMsgEl);
+
+            // If openTerminal is true, auto-open the terminal
+            if (data.terminalData.openTerminal) {
+                // Store analysis data for the terminal to pick up
+                sessionStorage.setItem("terminalAnalysis", JSON.stringify({
+                    chartActions: data.terminalData.chartActions,
+                    notes: data.terminalData.notes,
+                    message: data.terminalData.analysisMessage
+                }));
+
+                // Open terminal after a short delay so user sees the chat response first
+                setTimeout(() => {
+                    const symbol = data.terminalData.symbol || data.terminalTicker || "AAPL";
+                    window.open(`terminal.html?symbol=${encodeURIComponent(symbol)}`, "_blank");
+                }, 1500);
+            }
         }
     } catch (error) {
         loadingIndicator.remove();
@@ -47,11 +64,7 @@ chatForm.addEventListener("submit", async (e) => {
 
 // ------------------ HELPER FUNCTIONS ------------------
 /**
- * UPDATED: Cleans and formats text, then adds it to the chat interface.
- * @param {string} text The message content.
- * @param {string} sender The sender ('user' or 'bot').
- * @param {boolean} isLoading If true, shows a loading state.
- * @returns {HTMLElement} The created message element.
+ * Cleans and formats text, then adds it to the chat interface.
  */
 function addMessage(text, sender, isLoading = false) {
     const messageElement = document.createElement("div");
@@ -60,20 +73,17 @@ function addMessage(text, sender, isLoading = false) {
     if (isLoading) {
         messageElement.classList.add("loading");
         const p = document.createElement("p");
-        p.textContent = text; // Use textContent for security
+        p.textContent = text;
         messageElement.appendChild(p);
     } else if (sender === 'bot') {
-        // Step 1: Clean the raw text from the AI to remove unwanted signs
         let cleanText = text
-            .replace(/```(?:json|javascript|html|css|python)?/g, '') // Remove code fences and language hints
+            .replace(/```(?:json|javascript|html|css|python)?/g, '')
             .replace(/```/g, '')
-            .replace(/\*/g, '')   // Remove asterisks
+            .replace(/\*/g, '')
             .trim();
 
-        // Step 2: Format the cleaned text into proper paragraphs
-        const paragraphs = cleanText.split('\n').filter(p => p.trim() !== ''); // Split by newline and remove empty lines
+        const paragraphs = cleanText.split('\n').filter(p => p.trim() !== '');
 
-        // If there are no paragraphs, handle it as a single block of text
         if (paragraphs.length === 0) {
             const p = document.createElement('p');
             p.textContent = cleanText;
@@ -85,7 +95,7 @@ function addMessage(text, sender, isLoading = false) {
                 messageElement.appendChild(p);
             });
         }
-    } else { // For user messages, just display the text
+    } else {
         const p = document.createElement("p");
         p.textContent = text;
         messageElement.appendChild(p);
@@ -98,9 +108,6 @@ function addMessage(text, sender, isLoading = false) {
 
 /**
  * Appends a Chart.js stock chart card below the bot's text message.
- * @param {Object} stockData The stock metadata and history.
- * @param {HTMLElement} targetMessageEl The parent bot message element.
- * @param {string|null} terminalTicker Optional ticker for the Open Terminal button.
  */
 function appendStockCard(stockData, targetMessageEl, terminalTicker) {
     const card = document.createElement("div");
@@ -111,10 +118,7 @@ function appendStockCard(stockData, targetMessageEl, terminalTicker) {
     const changeClass = isUp ? "up" : "down";
     const sign = isUp ? "+" : "";
 
-    // Generate unique ID for chart canvas
     const chartId = `chart-${Date.now()}-${Math.floor(Math.random() * 1000)}`;
-
-    // Determine the ticker for the terminal link
     const termTicker = terminalTicker || stockData.ticker;
 
     card.innerHTML = `
@@ -135,19 +139,15 @@ function appendStockCard(stockData, targetMessageEl, terminalTicker) {
             <canvas id="${chartId}"></canvas>
         </div>
         <a href="terminal.html?symbol=${encodeURIComponent(termTicker)}" target="_blank" class="open-terminal-btn">
-            <i class="fas fa-chart-candlestick"></i>
             <i class="fas fa-chart-bar"></i>
             Open Terminal
         </a>
     `;
 
-    // Append to message element
     targetMessageEl.appendChild(card);
 
-    // Render Chart using Chart.js
     const ctx = document.getElementById(chartId).getContext("2d");
 
-    // Colors
     const lineColor = isUp ? "#10B981" : "#F43F5E";
     const gradient = ctx.createLinearGradient(0, 0, 0, 180);
     if (isUp) {
@@ -215,7 +215,86 @@ function appendStockCard(stockData, targetMessageEl, terminalTicker) {
         }
     });
 
-    // Auto-scroll chat messages
-    const chatMessages = document.getElementById("chat-messages");
     chatMessages.scrollTop = chatMessages.scrollHeight;
 }
+
+/**
+ * Appends an analysis preview card showing AI analysis results
+ * with a button to open the full terminal with pre-loaded analysis.
+ */
+function appendAnalysisPreview(terminalData, targetMessageEl) {
+    const preview = document.createElement("div");
+    preview.classList.add("analysis-preview-card");
+
+    const actionCount = terminalData.chartActions ? terminalData.chartActions.length : 0;
+    const noteCount = terminalData.notes ? terminalData.notes.length : 0;
+
+    // Extract key findings
+    const trendAction = terminalData.chartActions?.find(a => a.type === "DRAW_TREND_LINE");
+    const supports = terminalData.chartActions?.filter(a => a.type === "DRAW_SUPPORT") || [];
+    const resistances = terminalData.chartActions?.filter(a => a.type === "DRAW_RESISTANCE") || [];
+    const patterns = terminalData.chartActions?.filter(a => a.type === "ADD_PATTERN_MARKER") || [];
+
+    let findingsHtml = '<div class="preview-findings">';
+
+    if (trendAction) {
+        const trendColor = trendAction.direction === "bullish" ? "#10B981" : trendAction.direction === "bearish" ? "#F43F5E" : "#FBBF24";
+        const trendIcon = trendAction.direction === "bullish" ? "fa-arrow-trend-up" : "fa-arrow-trend-down";
+        findingsHtml += `<span class="preview-tag" style="background:${trendColor}20;color:${trendColor};border:1px solid ${trendColor}40">
+            <i class="fas ${trendIcon}"></i> ${trendAction.direction} (${trendAction.confidence}%)
+        </span>`;
+    }
+
+    if (supports.length > 0) {
+        findingsHtml += `<span class="preview-tag" style="background:rgba(59,130,246,0.15);color:#3B82F6;border:1px solid rgba(59,130,246,0.3)">
+            <i class="fas fa-arrow-down"></i> ${supports.length} support
+        </span>`;
+    }
+
+    if (resistances.length > 0) {
+        findingsHtml += `<span class="preview-tag" style="background:rgba(244,63,94,0.15);color:#F43F5E;border:1px solid rgba(244,63,94,0.3)">
+            <i class="fas fa-arrow-up"></i> ${resistances.length} resistance
+        </span>`;
+    }
+
+    if (patterns.length > 0) {
+        findingsHtml += `<span class="preview-tag" style="background:rgba(251,191,36,0.15);color:#FBBF24;border:1px solid rgba(251,191,36,0.3)">
+            <i class="fas fa-shapes"></i> ${patterns.length} patterns
+        </span>`;
+    }
+
+    findingsHtml += '</div>';
+
+    preview.innerHTML = `
+        <div class="preview-header">
+            <i class="fas fa-wand-magic-sparkles" style="color:#A855F7"></i>
+            <span>AI Analysis Ready</span>
+            <span class="preview-badge">${actionCount} actions · ${noteCount} notes</span>
+        </div>
+        ${findingsHtml}
+        <button class="preview-open-btn" onclick="openTerminalWithAnalysis('${encodeURIComponent(JSON.stringify({
+            chartActions: terminalData.chartActions,
+            notes: terminalData.notes,
+            message: terminalData.analysisMessage || ''
+        }))}', '${terminalData.symbol}')">
+            <i class="fas fa-chart-bar"></i> Open Terminal with Analysis
+        </button>
+    `;
+
+    targetMessageEl.appendChild(preview);
+    chatMessages.scrollTop = chatMessages.scrollHeight;
+}
+
+/**
+ * Opens the terminal with pre-loaded analysis data.
+ */
+window.openTerminalWithAnalysis = function(encodedData, symbol) {
+    try {
+        const data = JSON.parse(decodeURIComponent(encodedData));
+        sessionStorage.setItem("terminalAnalysis", JSON.stringify(data));
+        window.open(`terminal.html?symbol=${encodeURIComponent(symbol)}`, "_blank");
+    } catch (e) {
+        console.error("Failed to open terminal:", e);
+        window.open(`terminal.html?symbol=${encodeURIComponent(symbol)}`, "_blank");
+    }
+};

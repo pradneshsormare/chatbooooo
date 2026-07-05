@@ -1,6 +1,6 @@
 // ============================================================
-// terminal.js — Groww-Style Candlestick Chart Terminal
-// Uses TradingView Lightweight Charts + /api/candles endpoint
+// terminal.js — AI-Controlled Interactive Trading Terminal
+// TradingView Lightweight Charts + Drawing Tools + AI Analysis
 // ============================================================
 
 // -------------------- STATE --------------------
@@ -10,6 +10,35 @@ let volumeSeries = null;
 let currentSymbol = "";
 let currentRange = "1mo";
 let currentInterval = "1d";
+let currentCandleData = []; // All loaded candles (raw)
+let currentTool = "pointer";
+
+// Drawing state
+let drawings = {
+    trendLines: [],   // { series, startTime, endTime, startPrice, endPrice }
+    hLines: [],       // { priceLine, price }
+    fibLevels: [],    // { priceLines[] }
+    highlights: []    // { series }
+};
+
+// Rectangle selection state
+let selectionState = {
+    isSelecting: false,
+    startX: null, startY: null,
+    startTime: null, startPrice: null,
+    endTime: null, endPrice: null,
+    candles: [],
+    highlightSeries: null
+};
+
+// Drawing tool state (for trendline/hline/fibonacci)
+let drawingState = {
+    step: 0,  // 0=not started, 1=first click done
+    startTime: null, startPrice: null
+};
+
+// AI Notes
+let aiNotes = [];
 
 // -------------------- DOM --------------------
 const chartContainer = document.getElementById("candlestick-chart");
@@ -20,35 +49,56 @@ const headerTicker = document.getElementById("header-ticker");
 const headerExchange = document.getElementById("header-exchange");
 const headerPrice = document.getElementById("header-price");
 const headerChange = document.getElementById("header-change");
-const patternTags = document.getElementById("pattern-tags");
-const trendInfo = document.getElementById("trend-info");
 const tfButtons = document.querySelectorAll(".tf-btn[data-range]");
 const changeSymbolBtn = document.getElementById("change-symbol-btn");
 const searchOverlay = document.getElementById("symbol-search-overlay");
 const searchForm = document.getElementById("symbol-search-form");
 const searchInput = document.getElementById("symbol-search-input");
+const toolButtons = document.querySelectorAll(".tool-btn[data-tool]");
+const selectionInfoBar = document.getElementById("selection-info-bar");
+const selectionRangeText = document.getElementById("selection-range-text");
+const analyzeSelectionBtn = document.getElementById("analyze-selection-btn");
+const clearSelectionBtn = document.getElementById("clear-selection-btn");
+const terminalChatForm = document.getElementById("terminal-chat-form");
+const terminalChatInput = document.getElementById("terminal-chat-input");
+const notesList = document.getElementById("notes-list");
+const aiSummarySection = document.getElementById("ai-summary-section");
+const analysisTags = document.getElementById("analysis-tags");
+const notesToggleBtn = document.getElementById("notes-toggle-btn");
+const notesPanel = document.getElementById("ai-notes-panel");
+const patternPopup = document.getElementById("pattern-popup");
 
 // -------------------- INIT --------------------
 function init() {
-    // Read symbol from URL params
     const params = new URLSearchParams(window.location.search);
     currentSymbol = params.get("symbol") || "AAPL";
     currentRange = params.get("range") || "1mo";
     currentInterval = params.get("interval") || "1d";
 
-    // Highlight the active timeframe button
     tfButtons.forEach(btn => {
         btn.classList.toggle("active", btn.dataset.range === currentRange && btn.dataset.interval === currentInterval);
     });
 
-    // Create the chart
     createChart();
-
-    // Fetch and render data
     loadData(currentSymbol, currentRange, currentInterval);
-
-    // Event listeners
     setupEventListeners();
+
+    // Check if analysis data was passed via sessionStorage
+    const storedAnalysis = sessionStorage.getItem("terminalAnalysis");
+    if (storedAnalysis) {
+        sessionStorage.removeItem("terminalAnalysis");
+        try {
+            const data = JSON.parse(storedAnalysis);
+            // Delay execution to let chart load first
+            setTimeout(() => {
+                if (data.chartActions) executeChartActions(data.chartActions);
+                if (data.notes) renderNotes(data.notes);
+                if (data.message) showAISummary(data.message);
+            }, 2000);
+        } catch (e) {
+            console.warn("[terminal] Failed to parse stored analysis:", e);
+        }
+    }
 }
 
 // -------------------- CHART CREATION --------------------
@@ -107,7 +157,6 @@ function createChart() {
         },
     });
 
-    // Candlestick series
     candlestickSeries = chart.addCandlestickSeries({
         upColor: "#10B981",
         downColor: "#F43F5E",
@@ -117,7 +166,6 @@ function createChart() {
         wickUpColor: "#10B981",
     });
 
-    // Volume histogram series
     volumeSeries = chart.addHistogramSeries({
         priceFormat: { type: "volume" },
         priceScaleId: "volume",
@@ -137,6 +185,9 @@ function createChart() {
         }
     });
     resizeObserver.observe(chartContainer);
+
+    // Subscribe to crosshair move for coordinate tracking
+    chart.subscribeCrosshairMove(handleCrosshairMove);
 }
 
 // -------------------- DATA FETCHING --------------------
@@ -157,9 +208,9 @@ async function loadData(symbol, range, interval) {
         const data = await response.json();
         console.log(`[terminal] Received ${data.candles.length} candles for ${data.symbol}`);
 
+        currentCandleData = data.candles;
         renderChart(data);
         updateHeader(data);
-        updateAnalysisPanel(data);
         hideLoading();
 
     } catch (error) {
@@ -173,7 +224,6 @@ async function loadData(symbol, range, interval) {
 function renderChart(data) {
     const candles = data.candles;
 
-    // Set candlestick data
     candlestickSeries.setData(
         candles.map(c => ({
             time: c.time,
@@ -184,7 +234,6 @@ function renderChart(data) {
         }))
     );
 
-    // Set volume data with colors
     volumeSeries.setData(
         candles.map(c => ({
             time: c.time,
@@ -195,13 +244,13 @@ function renderChart(data) {
         }))
     );
 
-    // Place markers on candles where patterns are detected (limit to last 15 patterns to prevent overcrowding)
+    // Place markers for detected patterns (limit to last 20)
     const markers = [];
     const patternCandles = candles.filter(c => c.pattern);
-    const recentPatternCandles = patternCandles.slice(-15);
+    const recentPatterns = patternCandles.slice(-20);
 
     candles.forEach(c => {
-        if (c.pattern && recentPatternCandles.includes(c)) {
+        if (c.pattern && recentPatterns.includes(c)) {
             const isBullish = c.signal === "bullish";
             const isBearish = c.signal === "bearish";
 
@@ -217,8 +266,7 @@ function renderChart(data) {
 
     candlestickSeries.setMarkers(markers);
 
-    // Set visible range to show only the last 120 candles initially (for large datasets),
-    // allowing the user to scroll/zoom back to see older data.
+    // Set visible range
     const totalBars = candles.length;
     if (totalBars > 0) {
         chart.timeScale().setVisibleLogicalRange({
@@ -232,7 +280,6 @@ function renderChart(data) {
 function updateHeader(data) {
     headerTicker.textContent = data.symbol;
 
-    // Determine exchange from symbol
     const sym = data.symbol.toUpperCase();
     if (sym.endsWith(".NS")) {
         headerExchange.textContent = "NSE · India";
@@ -242,17 +289,14 @@ function updateHeader(data) {
         headerExchange.textContent = "NASDAQ / NYSE · US";
     }
 
-    // Live price from API
     if (data.livePrice) {
         const lp = data.livePrice;
         headerPrice.textContent = formatPrice(lp.currentPrice, sym);
-
         const sign = lp.change >= 0 ? "+" : "";
         const changeText = `${sign}${lp.change.toFixed(2)} (${sign}${lp.changePercent.toFixed(2)}%)`;
         headerChange.textContent = changeText;
         headerChange.className = "change " + (lp.change >= 0 ? "up" : "down");
     } else if (data.candles.length > 0) {
-        // Fallback to last candle price
         const last = data.candles[data.candles.length - 1];
         headerPrice.textContent = formatPrice(last.close, sym);
         headerChange.textContent = "";
@@ -268,61 +312,649 @@ function formatPrice(price, symbol) {
     return "$" + price.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 }
 
-// -------------------- ANALYSIS PANEL --------------------
-function updateAnalysisPanel(data) {
-    // Gather all detected patterns from the candles
-    const patternMap = new Map();
-    data.candles.forEach(c => {
-        if (c.pattern && !patternMap.has(c.pattern)) {
-            patternMap.set(c.pattern, c.signal);
+// -------------------- CHART ACTION EXECUTOR --------------------
+function executeChartActions(actions) {
+    if (!actions || !Array.isArray(actions)) return;
+
+    console.log(`[terminal] Executing ${actions.length} chart actions`);
+
+    actions.forEach(action => {
+        switch (action.type) {
+            case "HIGHLIGHT_RANGE":
+                highlightRange(action.startTime, action.endTime);
+                break;
+            case "DRAW_TREND_LINE":
+                drawTrendLine(action);
+                break;
+            case "DRAW_SUPPORT":
+                drawSupportLine(action.price, action.strength);
+                break;
+            case "DRAW_RESISTANCE":
+                drawResistanceLine(action.price, action.strength);
+                break;
+            case "ADD_PATTERN_MARKER":
+                // Pattern markers are handled through chart markers in renderChart
+                // but we also store for popup access
+                break;
+            case "ADD_NOTE":
+                aiNotes.push(action);
+                break;
         }
     });
+}
 
-    // Render tags
-    patternTags.innerHTML = "";
-    if (patternMap.size === 0) {
-        const tag = document.createElement("span");
-        tag.className = "pattern-tag neutral";
-        tag.innerHTML = '<i class="fas fa-minus-circle"></i> No patterns detected';
-        patternTags.appendChild(tag);
+function highlightRange(startTime, endTime) {
+    try {
+        const highlightData = currentCandleData
+            .filter(c => c.time >= startTime && c.time <= endTime)
+            .map(c => ({
+                time: c.time,
+                value: c.high,
+                color: "rgba(168, 85, 247, 0.08)"
+            }));
+
+        if (highlightData.length > 0) {
+            const hl = chart.addHistogramSeries({
+                priceScaleId: 'highlight',
+                priceFormat: { type: 'price' },
+            });
+            chart.priceScale('highlight').applyOptions({
+                scaleMargins: { top: 0, bottom: 0 },
+            });
+            hl.setData(highlightData);
+            drawings.highlights.push({ series: hl });
+        }
+    } catch (e) {
+        console.warn("[terminal] Highlight range failed:", e);
+    }
+}
+
+function drawTrendLine(action) {
+    try {
+        const trendData = [
+            { time: action.startTime, value: action.startPrice },
+            { time: action.endTime, value: action.endPrice }
+        ];
+
+        const color = action.direction === "bullish" ? "#10B981" : action.direction === "bearish" ? "#F43F5E" : "#FBBF24";
+
+        const lineSeries = chart.addLineSeries({
+            color: color,
+            lineWidth: 2,
+            lineStyle: LightweightCharts.LineStyle.Solid,
+            priceScaleId: '',
+            lastValueVisible: false,
+            priceLineVisible: false,
+        });
+        lineSeries.setData(trendData);
+
+        // Add trend label as marker
+        const midIdx = Math.floor(currentCandleData.length / 2);
+        const labelTime = action.endTime;
+        const dirLabel = action.direction === "bullish" ? "▲ BULLISH" : action.direction === "bearish" ? "▼ BEARISH" : "— SIDEWAYS";
+
+        candlestickSeries.setMarkers([
+            ...candlestickSeries.markers || [],
+        ]);
+
+        drawings.trendLines.push({
+            series: lineSeries,
+            ...action
+        });
+    } catch (e) {
+        console.warn("[terminal] Draw trend line failed:", e);
+    }
+}
+
+function drawSupportLine(price, strength) {
+    try {
+        const opacity = Math.min(1, (strength || 50) / 100);
+        const priceLine = candlestickSeries.createPriceLine({
+            price: price,
+            color: `rgba(59, 130, 246, ${opacity})`,
+            lineWidth: 1,
+            lineStyle: LightweightCharts.LineStyle.Dashed,
+            axisLabelVisible: true,
+            title: `S ${price}`,
+        });
+        drawings.hLines.push({ priceLine, price, type: "support" });
+    } catch (e) {
+        console.warn("[terminal] Draw support failed:", e);
+    }
+}
+
+function drawResistanceLine(price, strength) {
+    try {
+        const opacity = Math.min(1, (strength || 50) / 100);
+        const priceLine = candlestickSeries.createPriceLine({
+            price: price,
+            color: `rgba(244, 63, 94, ${opacity})`,
+            lineWidth: 1,
+            lineStyle: LightweightCharts.LineStyle.Dashed,
+            axisLabelVisible: true,
+            title: `R ${price}`,
+        });
+        drawings.hLines.push({ priceLine, price, type: "resistance" });
+    } catch (e) {
+        console.warn("[terminal] Draw resistance failed:", e);
+    }
+}
+
+// -------------------- DRAWING TOOLS --------------------
+function clearAllDrawings() {
+    drawings.trendLines.forEach(d => {
+        try { chart.removeSeries(d.series); } catch (e) {}
+    });
+    drawings.highlights.forEach(d => {
+        try { chart.removeSeries(d.series); } catch (e) {}
+    });
+    drawings.hLines.forEach(d => {
+        try { candlestickSeries.removePriceLine(d.priceLine); } catch (e) {}
+    });
+    drawings.fibLevels.forEach(d => {
+        d.priceLines.forEach(pl => {
+            try { candlestickSeries.removePriceLine(pl); } catch (e) {}
+        });
+    });
+
+    drawings = { trendLines: [], hLines: [], fibLevels: [], highlights: [] };
+    clearSelection();
+}
+
+function clearSelection() {
+    selectionState = {
+        isSelecting: false,
+        startX: null, startY: null,
+        startTime: null, startPrice: null,
+        endTime: null, endPrice: null,
+        candles: [],
+        highlightSeries: null
+    };
+    selectionInfoBar.classList.add("hidden");
+}
+
+// -------------------- RECTANGLE SELECTION --------------------
+function handleChartMouseDown(e) {
+    if (currentTool !== "rectangle" && currentTool !== "ai-analyze") return;
+    if (!chart) return;
+
+    const rect = chartContainer.getBoundingClientRect();
+    const x = e.clientX - rect.left;
+    const y = e.clientY - rect.top;
+
+    const coord = chart.timeScale().coordinateToTime(x);
+    const priceCoord = candlestickSeries.coordinateToPrice(y);
+
+    if (coord && priceCoord) {
+        selectionState.isSelecting = true;
+        selectionState.startTime = coord;
+        selectionState.startPrice = priceCoord;
+        selectionState.startX = x;
+        selectionState.startY = y;
+    }
+}
+
+function handleChartMouseUp(e) {
+    if (!selectionState.isSelecting) return;
+    selectionState.isSelecting = false;
+
+    const rect = chartContainer.getBoundingClientRect();
+    const x = e.clientX - rect.left;
+    const y = e.clientY - rect.top;
+
+    const coord = chart.timeScale().coordinateToTime(x);
+    const priceCoord = candlestickSeries.coordinateToPrice(y);
+
+    if (coord && priceCoord) {
+        selectionState.endTime = coord;
+        selectionState.endPrice = priceCoord;
+
+        // Normalize order
+        if (selectionState.startTime > selectionState.endTime) {
+            [selectionState.startTime, selectionState.endTime] = [selectionState.endTime, selectionState.startTime];
+        }
+        if (selectionState.startPrice > selectionState.endPrice) {
+            [selectionState.startPrice, selectionState.endPrice] = [selectionState.endPrice, selectionState.startPrice];
+        }
+
+        // Filter candles in the selected range
+        selectionState.candles = currentCandleData.filter(c =>
+            c.time >= selectionState.startTime && c.time <= selectionState.endTime
+        );
+
+        if (selectionState.candles.length > 0) {
+            // Show selection info
+            const startStr = formatTime(selectionState.startTime);
+            const endStr = formatTime(selectionState.endTime);
+            selectionRangeText.textContent = `Selected: ${startStr} → ${endStr} (${selectionState.candles.length} candles)`;
+            selectionInfoBar.classList.remove("hidden");
+
+            // Highlight the selected area
+            highlightRange(selectionState.startTime, selectionState.endTime);
+
+            // If AI analyze tool, auto-trigger analysis
+            if (currentTool === "ai-analyze") {
+                analyzeSelection();
+            }
+        }
+    }
+}
+
+function handleCrosshairMove(param) {
+    // Track mouse position for drawing tools
+}
+
+function handleChartClick(e) {
+    if (currentTool === "hline") {
+        const rect = chartContainer.getBoundingClientRect();
+        const y = e.clientY - rect.top;
+        const price = candlestickSeries.coordinateToPrice(y);
+        if (price) {
+            const priceLine = candlestickSeries.createPriceLine({
+                price: price,
+                color: "rgba(251, 191, 36, 0.7)",
+                lineWidth: 1,
+                lineStyle: LightweightCharts.LineStyle.Solid,
+                axisLabelVisible: true,
+                title: `H ${price.toFixed(2)}`,
+            });
+            drawings.hLines.push({ priceLine, price, type: "horizontal" });
+            setActiveTool("pointer");
+        }
+    } else if (currentTool === "trendline") {
+        const rect = chartContainer.getBoundingClientRect();
+        const x = e.clientX - rect.left;
+        const y = e.clientY - rect.top;
+        const time = chart.timeScale().coordinateToTime(x);
+        const price = candlestickSeries.coordinateToPrice(y);
+
+        if (time && price) {
+            if (drawingState.step === 0) {
+                drawingState.step = 1;
+                drawingState.startTime = time;
+                drawingState.startPrice = price;
+            } else {
+                // Second click — draw the line
+                const lineSeries = chart.addLineSeries({
+                    color: "#FBBF24",
+                    lineWidth: 2,
+                    lineStyle: LightweightCharts.LineStyle.Solid,
+                    lastValueVisible: false,
+                    priceLineVisible: false,
+                });
+                lineSeries.setData([
+                    { time: drawingState.startTime, value: drawingState.startPrice },
+                    { time: time, value: price }
+                ]);
+                drawings.trendLines.push({
+                    series: lineSeries,
+                    startTime: drawingState.startTime,
+                    endTime: time,
+                    startPrice: drawingState.startPrice,
+                    endPrice: price
+                });
+                drawingState.step = 0;
+                setActiveTool("pointer");
+            }
+        }
+    } else if (currentTool === "fibonacci") {
+        const rect = chartContainer.getBoundingClientRect();
+        const x = e.clientX - rect.left;
+        const y = e.clientY - rect.top;
+        const time = chart.timeScale().coordinateToTime(x);
+        const price = candlestickSeries.coordinateToPrice(y);
+
+        if (time && price) {
+            if (drawingState.step === 0) {
+                drawingState.step = 1;
+                drawingState.startTime = time;
+                drawingState.startPrice = price;
+            } else {
+                // Draw Fibonacci levels
+                const high = Math.max(drawingState.startPrice, price);
+                const low = Math.min(drawingState.startPrice, price);
+                const diff = high - low;
+                const levels = [0, 0.236, 0.382, 0.5, 0.618, 0.786, 1];
+                const colors = ["#F43F5E", "#FF6B6B", "#FBBF24", "#94A3B8", "#34D399", "#10B981", "#3B82F6"];
+
+                const priceLines = levels.map((level, idx) => {
+                    const levelPrice = high - diff * level;
+                    return candlestickSeries.createPriceLine({
+                        price: levelPrice,
+                        color: colors[idx],
+                        lineWidth: 1,
+                        lineStyle: LightweightCharts.LineStyle.Dotted,
+                        axisLabelVisible: true,
+                        title: `${(level * 100).toFixed(1)}% — ${levelPrice.toFixed(2)}`,
+                    });
+                });
+
+                drawings.fibLevels.push({ priceLines });
+                drawingState.step = 0;
+                setActiveTool("pointer");
+            }
+        }
+    }
+
+    // Check if a pattern candle was clicked
+    if (currentTool === "pointer" || currentTool === "crosshair") {
+        const rect = chartContainer.getBoundingClientRect();
+        const x = e.clientX - rect.left;
+        const time = chart.timeScale().coordinateToTime(x);
+
+        if (time) {
+            const candle = currentCandleData.find(c => c.time === time);
+            if (candle && candle.pattern) {
+                showPatternPopup(candle, e.clientX, e.clientY);
+            }
+        }
+    }
+}
+
+// -------------------- PATTERN POPUP --------------------
+function showPatternPopup(candle, x, y) {
+    const popup = patternPopup;
+    popup.classList.remove("hidden");
+
+    document.getElementById("popup-pattern-name").textContent = candle.pattern;
+    document.getElementById("popup-time").textContent = formatTime(candle.time);
+    document.getElementById("popup-price").textContent = formatPrice(candle.close, currentSymbol);
+    document.getElementById("popup-signal").textContent = (candle.signal || "neutral").toUpperCase();
+    document.getElementById("popup-signal").style.color =
+        candle.signal === "bullish" ? "#10B981" : candle.signal === "bearish" ? "#F43F5E" : "#FBBF24";
+    document.getElementById("popup-confidence").textContent = (candle.confidence || 70) + "%";
+    document.getElementById("popup-explanation").textContent = candle.explanation || "Standard candlestick pattern.";
+
+    // Position popup near click
+    const maxX = window.innerWidth - 300;
+    const maxY = window.innerHeight - 250;
+    popup.style.left = Math.min(x + 10, maxX) + "px";
+    popup.style.top = Math.min(y + 10, maxY) + "px";
+}
+
+function hidePatternPopup() {
+    patternPopup.classList.add("hidden");
+}
+
+// -------------------- AI ANALYSIS --------------------
+async function analyzeSelection() {
+    if (selectionState.candles.length < 3) {
+        showAISummary("Please select at least 3 candles to analyze.");
+        return;
+    }
+
+    showAnalysisLoading();
+
+    try {
+        const response = await fetch("/api/terminal-analyze", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+                message: "Analyze this selected area completely",
+                symbol: currentSymbol,
+                interval: currentInterval,
+                selectedRange: {
+                    startTime: selectionState.startTime,
+                    endTime: selectionState.endTime,
+                    startPrice: selectionState.startPrice,
+                    endPrice: selectionState.endPrice,
+                    candles: selectionState.candles
+                }
+            })
+        });
+
+        const data = await response.json();
+
+        if (data.chartActions) executeChartActions(data.chartActions);
+        if (data.notes) renderNotes(data.notes);
+        if (data.message) showAISummary(data.message);
+
+        renderAnalysisTags(data);
+
+    } catch (error) {
+        console.error("[terminal] Analysis error:", error);
+        showAISummary("Analysis failed. Please try again.");
+    }
+}
+
+async function sendTerminalChat(message) {
+    showAnalysisLoading();
+
+    try {
+        const payload = {
+            message: message,
+            symbol: currentSymbol,
+            interval: currentInterval
+        };
+
+        // Include selection if available
+        if (selectionState.candles.length > 0) {
+            payload.selectedRange = {
+                startTime: selectionState.startTime,
+                endTime: selectionState.endTime,
+                startPrice: selectionState.startPrice,
+                endPrice: selectionState.endPrice,
+                candles: selectionState.candles
+            };
+        }
+
+        const response = await fetch("/api/terminal-analyze", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(payload)
+        });
+
+        const data = await response.json();
+
+        // Clear previous drawings before applying new analysis
+        clearAllDrawings();
+
+        if (data.chartActions) executeChartActions(data.chartActions);
+        if (data.notes) renderNotes(data.notes);
+        if (data.message) showAISummary(data.message);
+
+        renderAnalysisTags(data);
+
+    } catch (error) {
+        console.error("[terminal] Chat error:", error);
+        showAISummary("Analysis failed. Please try again.");
+    }
+}
+
+// -------------------- NOTES PANEL --------------------
+function renderNotes(notes) {
+    aiNotes = notes;
+    notesList.innerHTML = "";
+
+    if (!notes || notes.length === 0) {
+        notesList.innerHTML = '<div class="note-card"><p class="note-card-text" style="color:var(--t-text-dim);font-style:italic;">No analysis notes yet.</p></div>';
+        return;
+    }
+
+    notes.forEach((note, idx) => {
+        const card = document.createElement("div");
+        card.className = "note-card";
+        card.innerHTML = `
+            <div class="note-card-time">${formatTime(note.time)}</div>
+            <div class="note-card-text">${note.text}</div>
+            <span class="note-card-category ${note.category || 'trend'}">${note.category || 'info'}</span>
+        `;
+        card.addEventListener("click", () => navigateToCandle(note.time));
+        notesList.appendChild(card);
+    });
+}
+
+function navigateToCandle(time) {
+    if (!time || !chart) return;
+
+    try {
+        // Find the candle index
+        const idx = currentCandleData.findIndex(c => c.time === time);
+        if (idx >= 0) {
+            chart.timeScale().setVisibleLogicalRange({
+                from: Math.max(0, idx - 15),
+                to: Math.min(currentCandleData.length, idx + 15)
+            });
+        }
+    } catch (e) {
+        console.warn("[terminal] Navigate to candle failed:", e);
+    }
+}
+
+function showAISummary(text) {
+    aiSummarySection.innerHTML = "";
+    const p = document.createElement("p");
+    p.className = "ai-summary-text";
+    p.textContent = text;
+    aiSummarySection.appendChild(p);
+}
+
+function showAnalysisLoading() {
+    aiSummarySection.innerHTML = `
+        <div class="analysis-loading">
+            <div class="mini-spinner"></div>
+            <span>Analyzing...</span>
+        </div>
+    `;
+    notesList.innerHTML = "";
+    analysisTags.innerHTML = "";
+}
+
+function renderAnalysisTags(data) {
+    analysisTags.innerHTML = "";
+
+    if (data.chartActions) {
+        const actionTypes = new Set(data.chartActions.map(a => a.type));
+
+        if (actionTypes.has("DRAW_TREND_LINE")) {
+            const trendAction = data.chartActions.find(a => a.type === "DRAW_TREND_LINE");
+            const tag = createTag("trend", `${trendAction?.direction || "trend"} ${trendAction?.confidence || ""}%`);
+            analysisTags.appendChild(tag);
+        }
+        if (actionTypes.has("DRAW_SUPPORT")) {
+            const count = data.chartActions.filter(a => a.type === "DRAW_SUPPORT").length;
+            analysisTags.appendChild(createTag("support", `${count} support`));
+        }
+        if (actionTypes.has("DRAW_RESISTANCE")) {
+            const count = data.chartActions.filter(a => a.type === "DRAW_RESISTANCE").length;
+            analysisTags.appendChild(createTag("resistance", `${count} resistance`));
+        }
+        if (actionTypes.has("ADD_PATTERN_MARKER")) {
+            const patterns = data.chartActions.filter(a => a.type === "ADD_PATTERN_MARKER");
+            analysisTags.appendChild(createTag("pattern", `${patterns.length} patterns`));
+        }
+    }
+}
+
+function createTag(category, text) {
+    const tag = document.createElement("span");
+    tag.className = `analysis-tag ${category}`;
+    tag.textContent = text;
+    return tag;
+}
+
+// -------------------- TOOL MANAGEMENT --------------------
+function setActiveTool(tool) {
+    currentTool = tool;
+    toolButtons.forEach(btn => {
+        btn.classList.toggle("active", btn.dataset.tool === tool);
+    });
+
+    // Update chart interaction mode
+    if (tool === "pointer") {
+        chart.applyOptions({
+            handleScroll: { mouseWheel: true, pressedMouseMove: true },
+            handleScale: { mouseWheel: true },
+            crosshair: { mode: LightweightCharts.CrosshairMode.Normal }
+        });
+    } else if (tool === "crosshair") {
+        chart.applyOptions({
+            crosshair: { mode: LightweightCharts.CrosshairMode.Normal }
+        });
     } else {
-        patternMap.forEach((signal, pattern) => {
-            const tag = document.createElement("span");
-            tag.className = `pattern-tag ${signal}`;
-            const icon = signal === "bullish" ? "fa-arrow-trend-up"
-                : signal === "bearish" ? "fa-arrow-trend-down"
-                : "fa-circle-dot";
-            tag.innerHTML = `<i class="fas ${icon}"></i> ${pattern}`;
-            patternTags.appendChild(tag);
+        // For drawing tools, keep chart interaction but also handle clicks
+        chart.applyOptions({
+            handleScroll: { mouseWheel: true, pressedMouseMove: false },
+            crosshair: { mode: LightweightCharts.CrosshairMode.Normal }
         });
     }
 
-    // Trend info
-    if (data.trend) {
-        const dir = data.trend.direction;
-        const pct = data.trend.changePercent;
-        const sign = pct >= 0 ? "+" : "";
-        const icon = dir === "up" ? "fa-arrow-trend-up" : dir === "down" ? "fa-arrow-trend-down" : "fa-minus";
+    // Reset drawing state
+    drawingState.step = 0;
 
-        trendInfo.className = `trend-info ${dir}`;
-        trendInfo.innerHTML = `<i class="fas ${icon}"></i> Trend (${currentRange.toUpperCase()}): ${sign}${pct}%`;
+    // Update cursor
+    const cursor = (tool === "rectangle" || tool === "ai-analyze") ? "crosshair" :
+                   (tool === "trendline" || tool === "hline" || tool === "fibonacci") ? "crosshair" : "default";
+    chartContainer.style.cursor = cursor;
+}
+
+// -------------------- ZOOM CONTROLS --------------------
+function zoomIn() {
+    const range = chart.timeScale().getVisibleLogicalRange();
+    if (range) {
+        const center = (range.from + range.to) / 2;
+        const halfSpan = (range.to - range.from) / 4;
+        chart.timeScale().setVisibleLogicalRange({
+            from: center - halfSpan,
+            to: center + halfSpan
+        });
     }
 }
 
-// -------------------- UI HELPERS --------------------
-function showLoading() {
-    loadingEl.classList.remove("hidden");
+function zoomOut() {
+    const range = chart.timeScale().getVisibleLogicalRange();
+    if (range) {
+        const center = (range.from + range.to) / 2;
+        const halfSpan = (range.to - range.from);
+        chart.timeScale().setVisibleLogicalRange({
+            from: center - halfSpan,
+            to: center + halfSpan
+        });
+    }
 }
-function hideLoading() {
-    loadingEl.classList.add("hidden");
+
+function fitChart() {
+    chart.timeScale().fitContent();
 }
-function showError(msg) {
-    errorMsg.textContent = msg;
-    errorEl.classList.remove("hidden");
+
+function resetChart() {
+    clearAllDrawings();
+    aiNotes = [];
+    notesList.innerHTML = "";
+    aiSummarySection.innerHTML = '<p class="ai-summary-placeholder">Select an area or type a command to start analysis.</p>';
+    analysisTags.innerHTML = "";
+    fitChart();
 }
-function hideError() {
-    errorEl.classList.add("hidden");
+
+// -------------------- HELPERS --------------------
+function formatTime(time) {
+    if (typeof time === "number") {
+        const d = new Date(time * 1000);
+        return d.toLocaleString("en-IN", {
+            hour: "2-digit", minute: "2-digit",
+            day: "2-digit", month: "short",
+            hour12: true
+        });
+    }
+    if (typeof time === "string") {
+        if (time.includes("T")) {
+            return new Date(time).toLocaleString("en-IN", {
+                hour: "2-digit", minute: "2-digit",
+                day: "2-digit", month: "short",
+                hour12: true
+            });
+        }
+        // YYYY-MM-DD
+        const d = new Date(time + "T00:00:00");
+        return d.toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" });
+    }
+    return String(time);
 }
+
+function showLoading() { loadingEl.classList.remove("hidden"); }
+function hideLoading() { loadingEl.classList.add("hidden"); }
+function showError(msg) { errorMsg.textContent = msg; errorEl.classList.remove("hidden"); }
+function hideError() { errorEl.classList.add("hidden"); }
 
 // -------------------- EVENT LISTENERS --------------------
 function setupEventListeners() {
@@ -338,13 +970,12 @@ function setupEventListeners() {
             tfButtons.forEach(b => b.classList.remove("active"));
             btn.classList.add("active");
 
-            // Update URL parameters without reload
             const url = new URL(window.location);
             url.searchParams.set("range", range);
             url.searchParams.set("interval", interval);
-            url.searchParams.delete("days"); // clean up old param if present
             window.history.replaceState({}, "", url);
 
+            clearAllDrawings();
             loadData(currentSymbol, currentRange, currentInterval);
         });
     });
@@ -357,14 +988,11 @@ function setupEventListeners() {
         searchInput.select();
     });
 
-    // Search overlay close on click outside
+    // Search overlay
     searchOverlay.addEventListener("click", (e) => {
-        if (e.target === searchOverlay) {
-            searchOverlay.classList.add("hidden");
-        }
+        if (e.target === searchOverlay) searchOverlay.classList.add("hidden");
     });
 
-    // Search form submit
     searchForm.addEventListener("submit", (e) => {
         e.preventDefault();
         const newSymbol = searchInput.value.trim().toUpperCase();
@@ -373,18 +1001,104 @@ function setupEventListeners() {
         currentSymbol = newSymbol;
         searchOverlay.classList.add("hidden");
 
-        // Update URL
         const url = new URL(window.location);
         url.searchParams.set("symbol", newSymbol);
         window.history.replaceState({}, "", url);
 
+        clearAllDrawings();
         loadData(currentSymbol, currentRange, currentInterval);
     });
 
-    // Keyboard shortcut: Escape to close search
+    // Drawing tool buttons
+    toolButtons.forEach(btn => {
+        btn.addEventListener("click", () => setActiveTool(btn.dataset.tool));
+    });
+
+    // Zoom controls
+    document.getElementById("zoom-in-btn").addEventListener("click", zoomIn);
+    document.getElementById("zoom-out-btn").addEventListener("click", zoomOut);
+    document.getElementById("fit-chart-btn").addEventListener("click", fitChart);
+    document.getElementById("reset-chart-btn").addEventListener("click", resetChart);
+
+    // Delete / Clear
+    document.getElementById("delete-drawing-btn").addEventListener("click", () => {
+        // Remove last drawing
+        if (drawings.trendLines.length > 0) {
+            const last = drawings.trendLines.pop();
+            try { chart.removeSeries(last.series); } catch (e) {}
+        } else if (drawings.hLines.length > 0) {
+            const last = drawings.hLines.pop();
+            try { candlestickSeries.removePriceLine(last.priceLine); } catch (e) {}
+        } else if (drawings.fibLevels.length > 0) {
+            const last = drawings.fibLevels.pop();
+            last.priceLines.forEach(pl => {
+                try { candlestickSeries.removePriceLine(pl); } catch (e) {}
+            });
+        }
+    });
+    document.getElementById("clear-all-btn").addEventListener("click", clearAllDrawings);
+
+    // Selection buttons
+    analyzeSelectionBtn.addEventListener("click", analyzeSelection);
+    clearSelectionBtn.addEventListener("click", clearSelection);
+
+    // Chart mouse events for rectangle selection
+    chartContainer.addEventListener("mousedown", handleChartMouseDown);
+    chartContainer.addEventListener("mouseup", handleChartMouseUp);
+    chartContainer.addEventListener("click", handleChartClick);
+
+    // Terminal chat
+    terminalChatForm.addEventListener("submit", (e) => {
+        e.preventDefault();
+        const msg = terminalChatInput.value.trim();
+        if (!msg) return;
+        terminalChatInput.value = "";
+        sendTerminalChat(msg);
+    });
+
+    // Notes panel toggle
+    notesToggleBtn.addEventListener("click", () => {
+        notesPanel.classList.toggle("collapsed");
+        const icon = notesToggleBtn.querySelector("i");
+        icon.className = notesPanel.classList.contains("collapsed") ? "fas fa-chevron-left" : "fas fa-chevron-right";
+    });
+
+    // Pattern popup close
+    document.getElementById("popup-close-btn").addEventListener("click", hidePatternPopup);
+
+    // Keyboard shortcuts
     document.addEventListener("keydown", (e) => {
-        if (e.key === "Escape" && !searchOverlay.classList.contains("hidden")) {
-            searchOverlay.classList.add("hidden");
+        if (e.target.tagName === "INPUT") return;
+
+        switch (e.key.toLowerCase()) {
+            case "escape":
+                if (!searchOverlay.classList.contains("hidden")) {
+                    searchOverlay.classList.add("hidden");
+                } else {
+                    hidePatternPopup();
+                    setActiveTool("pointer");
+                }
+                break;
+            case "v": setActiveTool("pointer"); break;
+            case "r": setActiveTool("rectangle"); break;
+            case "a": setActiveTool("ai-analyze"); break;
+            case "t": setActiveTool("trendline"); break;
+            case "h": setActiveTool("hline"); break;
+            case "f": setActiveTool("fibonacci"); break;
+            case "delete":
+            case "backspace":
+                document.getElementById("delete-drawing-btn").click();
+                break;
+        }
+    });
+
+    // Close popup on click outside
+    document.addEventListener("click", (e) => {
+        if (!patternPopup.contains(e.target) && !patternPopup.classList.contains("hidden")) {
+            // Small delay to avoid closing immediately
+            setTimeout(() => {
+                if (!patternPopup.matches(":hover")) hidePatternPopup();
+            }, 100);
         }
     });
 }

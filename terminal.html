@@ -59,35 +59,172 @@
         </div>
     </div>
 
-    <!-- ===== CHART AREA ===== -->
-    <div class="terminal-chart-wrapper">
-        <div id="candlestick-chart"></div>
+    <!-- ===== MAIN WORKSPACE (toolbar + chart + notes) ===== -->
+    <div class="terminal-workspace">
 
-        <!-- Loading Overlay -->
-        <div class="terminal-loading" id="chart-loading">
-            <div class="terminal-spinner"></div>
-            <p>Fetching market data...</p>
+        <!-- LEFT: Drawing Toolbar -->
+        <div class="chart-toolbar" id="chart-toolbar">
+            <div class="toolbar-group">
+                <button class="tool-btn active" data-tool="pointer" title="Pointer (V)">
+                    <i class="fas fa-mouse-pointer"></i>
+                </button>
+                <button class="tool-btn" data-tool="crosshair" title="Crosshair (+)">
+                    <i class="fas fa-crosshairs"></i>
+                </button>
+            </div>
+            <div class="toolbar-divider"></div>
+            <div class="toolbar-group">
+                <button class="tool-btn" data-tool="rectangle" title="Rectangle Selection (R)">
+                    <i class="far fa-square"></i>
+                </button>
+                <button class="tool-btn ai-tool-btn" data-tool="ai-analyze" title="AI Area Analysis (A)">
+                    <i class="fas fa-wand-magic-sparkles"></i>
+                </button>
+            </div>
+            <div class="toolbar-divider"></div>
+            <div class="toolbar-group">
+                <button class="tool-btn" data-tool="trendline" title="Trend Line (T)">
+                    <i class="fas fa-chart-line"></i>
+                </button>
+                <button class="tool-btn" data-tool="hline" title="Horizontal Line (H)">
+                    <i class="fas fa-grip-lines"></i>
+                </button>
+                <button class="tool-btn" data-tool="fibonacci" title="Fibonacci Retracement (F)">
+                    <i class="fas fa-wave-square"></i>
+                </button>
+            </div>
+            <div class="toolbar-divider"></div>
+            <div class="toolbar-group">
+                <button class="tool-btn" id="zoom-in-btn" title="Zoom In">
+                    <i class="fas fa-magnifying-glass-plus"></i>
+                </button>
+                <button class="tool-btn" id="zoom-out-btn" title="Zoom Out">
+                    <i class="fas fa-magnifying-glass-minus"></i>
+                </button>
+                <button class="tool-btn" id="fit-chart-btn" title="Fit Chart">
+                    <i class="fas fa-expand"></i>
+                </button>
+                <button class="tool-btn" id="reset-chart-btn" title="Reset Chart">
+                    <i class="fas fa-rotate-left"></i>
+                </button>
+            </div>
+            <div class="toolbar-divider"></div>
+            <div class="toolbar-group">
+                <button class="tool-btn danger-btn" id="delete-drawing-btn" title="Delete Selected (Del)">
+                    <i class="fas fa-eraser"></i>
+                </button>
+                <button class="tool-btn danger-btn" id="clear-all-btn" title="Clear All Drawings">
+                    <i class="fas fa-trash-can"></i>
+                </button>
+            </div>
         </div>
 
-        <!-- Error Overlay -->
-        <div class="terminal-error hidden" id="chart-error">
-            <i class="fas fa-exclamation-triangle"></i>
-            <p id="error-message">Failed to load data.</p>
-            <button onclick="location.reload()">Retry</button>
+        <!-- CENTER: Chart + Chat -->
+        <div class="chart-main-area">
+            <!-- Selection Info Bar (shows when area is selected) -->
+            <div class="selection-info-bar hidden" id="selection-info-bar">
+                <div class="selection-info-text">
+                    <i class="fas fa-vector-square"></i>
+                    <span id="selection-range-text">Selected: —</span>
+                </div>
+                <button class="analyze-selection-btn" id="analyze-selection-btn">
+                    <i class="fas fa-wand-magic-sparkles"></i> Analyze Selection
+                </button>
+                <button class="clear-selection-btn" id="clear-selection-btn">
+                    <i class="fas fa-xmark"></i>
+                </button>
+            </div>
+
+            <!-- Chart Container -->
+            <div class="terminal-chart-wrapper">
+                <div id="candlestick-chart"></div>
+
+                <!-- Loading Overlay -->
+                <div class="terminal-loading" id="chart-loading">
+                    <div class="terminal-spinner"></div>
+                    <p>Fetching market data...</p>
+                </div>
+
+                <!-- Error Overlay -->
+                <div class="terminal-error hidden" id="chart-error">
+                    <i class="fas fa-exclamation-triangle"></i>
+                    <p id="error-message">Failed to load data.</p>
+                    <button onclick="location.reload()">Retry</button>
+                </div>
+            </div>
+
+            <!-- Terminal Chat Input -->
+            <div class="terminal-chat-bar">
+                <form id="terminal-chat-form">
+                    <div class="terminal-chat-input-wrap">
+                        <i class="fas fa-wand-magic-sparkles"></i>
+                        <input
+                            type="text"
+                            id="terminal-chat-input"
+                            placeholder="Ask AI: 'Analyse from 10 AM to 2 PM' or 'Show trend in this area'..."
+                            autocomplete="off"
+                        >
+                        <button type="submit" title="Send">
+                            <i class="fas fa-paper-plane"></i>
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+
+        <!-- RIGHT: AI Notes Panel -->
+        <div class="ai-notes-panel" id="ai-notes-panel">
+            <div class="notes-panel-header">
+                <div class="notes-title">
+                    <i class="fas fa-brain"></i>
+                    <span>AI Analysis</span>
+                </div>
+                <button class="notes-toggle-btn" id="notes-toggle-btn" title="Toggle Notes">
+                    <i class="fas fa-chevron-right"></i>
+                </button>
+            </div>
+
+            <!-- AI Summary -->
+            <div class="ai-summary-section" id="ai-summary-section">
+                <p class="ai-summary-placeholder">Select an area or type a command to start analysis.</p>
+            </div>
+
+            <!-- Analysis Tags -->
+            <div class="analysis-tags" id="analysis-tags">
+                <!-- Filled dynamically -->
+            </div>
+
+            <!-- Notes List -->
+            <div class="notes-list" id="notes-list">
+                <!-- Filled dynamically with clickable note cards -->
+            </div>
         </div>
     </div>
 
-    <!-- ===== ANALYSIS PANEL ===== -->
-    <div class="terminal-analysis-panel">
-        <div class="analysis-label">
-            <i class="fas fa-fire"></i>
-            <span>AI ANALYSIS</span>
+    <!-- ===== PATTERN DETAILS POPUP ===== -->
+    <div class="pattern-popup hidden" id="pattern-popup">
+        <div class="pattern-popup-header">
+            <span class="pattern-popup-name" id="popup-pattern-name">—</span>
+            <button class="pattern-popup-close" id="popup-close-btn"><i class="fas fa-xmark"></i></button>
         </div>
-        <div class="pattern-tags" id="pattern-tags">
-            <!-- Filled dynamically -->
-        </div>
-        <div class="trend-info" id="trend-info">
-            <!-- Filled dynamically -->
+        <div class="pattern-popup-body">
+            <div class="popup-detail-row">
+                <span class="popup-label">Time</span>
+                <span class="popup-value" id="popup-time">—</span>
+            </div>
+            <div class="popup-detail-row">
+                <span class="popup-label">Price</span>
+                <span class="popup-value" id="popup-price">—</span>
+            </div>
+            <div class="popup-detail-row">
+                <span class="popup-label">Signal</span>
+                <span class="popup-value" id="popup-signal">—</span>
+            </div>
+            <div class="popup-detail-row">
+                <span class="popup-label">Confidence</span>
+                <span class="popup-value" id="popup-confidence">—</span>
+            </div>
+            <div class="popup-explanation" id="popup-explanation">—</div>
         </div>
     </div>
 
@@ -96,10 +233,10 @@
         <div class="symbol-search-box">
             <h3><i class="fas fa-search"></i> Search Symbol</h3>
             <form id="symbol-search-form">
-                <input 
-                    type="text" 
-                    class="symbol-search-input" 
-                    id="symbol-search-input" 
+                <input
+                    type="text"
+                    class="symbol-search-input"
+                    id="symbol-search-input"
                     placeholder="AAPL, RELIANCE.NS, TCS.NS..."
                     autocomplete="off"
                     autofocus
