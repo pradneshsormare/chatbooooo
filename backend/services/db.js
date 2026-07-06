@@ -5,8 +5,13 @@ import { fileURLToPath } from "url";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
-const fallbackHistoryPath = path.join(__dirname, "..", "data", "search_history.json");
-const usersPath = path.join(__dirname, "..", "data", "users.json");
+const isVercel = !!process.env.VERCEL;
+const fallbackHistoryPath = isVercel
+  ? path.join("/tmp", "search_history.json")
+  : path.join(__dirname, "..", "data", "search_history.json");
+const usersPath = isVercel
+  ? path.join("/tmp", "users.json")
+  : path.join(__dirname, "..", "data", "users.json");
 
 const { Pool } = pg;
 const connectionString = process.env.DATABASE_URL || "postgresql://postgres:postgres@localhost:5432/tradebot";
