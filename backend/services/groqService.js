@@ -121,11 +121,47 @@ Return ONLY valid JSON.`;
   }
 }
 
+/**
+ * Summarizes the search query and the chatbot response into a brief 1-sentence description.
+ */
+async function generateSearchSummary(query, answer) {
+  try {
+    const prompt = `
+      Create a very concise, 1-sentence summary of the following search/chat interaction.
+      It should be brief, descriptive, and suitable for a history tab. Avoid generic sentences. Do NOT include any markdown formatting like quotes, asterisks, or backticks.
+      Examples:
+      - Query: "analyze reliance", Answer: "Bullish trend identified..." -> "Analyzed RELIANCE.NS stock (detected bullish trend)"
+      - Query: "what is SIP?", Answer: "Systematic Investment Plan is..." -> "Explained Systematic Investment Plans (SIP)"
+      - Query: "show me terminal for TCS", Answer: "Opening terminal..." -> "Opened trading terminal for TCS.NS"
+      
+      Interaction:
+      User query: "${query}"
+      Bot reply: "${answer.substring(0, 300)}..."
+      
+      Summary:
+    `;
+
+    const completion = await groq.chat.completions.create({
+      model: "llama-3.1-8b-instant",
+      messages: [{ role: "user", content: prompt }],
+      max_tokens: 60,
+      temperature: 0.3
+    });
+
+    return completion.choices[0].message.content.trim().replace(/[`"*_#]/g, "");
+  } catch (error) {
+    console.error("Error generating search summary:", error);
+    // Simple fallback summary
+    return query.length > 50 ? query.substring(0, 47) + "..." : query;
+  }
+}
+
 export {
   groq,
   SYSTEM_INSTRUCTION,
   getChatHistory,
   setChatHistory,
   detectStockIntent,
-  parseAnalysisRequest
+  parseAnalysisRequest,
+  generateSearchSummary
 };

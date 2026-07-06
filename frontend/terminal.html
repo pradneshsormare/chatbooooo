@@ -175,28 +175,41 @@
             <div class="resize-handle" id="panel-resize-handle"></div>
 
             <div class="notes-panel-header">
-                <div class="notes-title">
-                    <i class="fas fa-wand-magic-sparkles"></i>
-                    <span>AI Assistant</span>
+                <div class="panel-tabs">
+                    <button class="panel-tab-btn active" id="tab-notes-btn"><i class="fas fa-robot"></i> AI Notes</button>
+                    <button class="panel-tab-btn" id="tab-history-btn"><i class="fas fa-history"></i> History</button>
                 </div>
                 <button class="notes-toggle-btn" id="notes-toggle-btn" title="Close Panel">
                     <i class="fas fa-chevron-right"></i>
                 </button>
             </div>
 
-            <!-- AI Summary / Responses -->
-            <div class="ai-summary-section" id="ai-summary-section">
-                <p class="ai-summary-placeholder">Select an area or type a command below to start analysis.</p>
+            <!-- Tab Content Wrapper -->
+            <div id="notes-tab-content" class="tab-content active-tab" style="display: flex; flex-direction: column; flex-grow: 1; overflow-y: auto;">
+                <!-- AI Summary / Responses -->
+                <div class="ai-summary-section" id="ai-summary-section">
+                    <p class="ai-summary-placeholder">Select an area or type a command below to start analysis.</p>
+                </div>
+
+                <!-- Analysis Tags -->
+                <div class="analysis-tags" id="analysis-tags">
+                    <!-- Filled dynamically -->
+                </div>
+
+                <!-- Notes List -->
+                <div class="notes-list" id="notes-list">
+                    <!-- Filled dynamically with clickable note cards -->
+                </div>
             </div>
 
-            <!-- Analysis Tags -->
-            <div class="analysis-tags" id="analysis-tags">
-                <!-- Filled dynamically -->
-            </div>
-
-            <!-- Notes List -->
-            <div class="notes-list" id="notes-list">
-                <!-- Filled dynamically with clickable note cards -->
+            <!-- Search History Tab Content -->
+            <div id="history-tab-content" class="tab-content hidden" style="display: flex; flex-direction: column; flex-grow: 1; overflow: hidden; width: 100%;">
+                <div class="sidebar-header" style="border-bottom: 1px solid rgba(255, 255, 255, 0.05); padding: 0.8rem 1.2rem; min-width: unset; width: 100%; display: flex; justify-content: flex-end;">
+                    <button id="clear-history-btn" class="clear-btn" title="Clear all history"><i class="fas fa-trash-alt"></i> Clear All</button>
+                </div>
+                <div class="history-list" id="history-list" style="padding: 1rem; flex-grow: 1; overflow-y: auto; width: 100%;">
+                    <p class="history-empty">No search history yet.</p>
+                </div>
             </div>
 
             <!-- Integrated Chat Form -->

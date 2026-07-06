@@ -11,8 +11,13 @@ import authRoutes from "./routes/authRoutes.js";
 import chatRoutes from "./routes/chatRoutes.js";
 import marketRoutes from "./routes/marketRoutes.js";
 import terminalRoutes from "./routes/terminalRoutes.js";
+import historyRoutes from "./routes/historyRoutes.js";
+import { initDatabase } from "./services/db.js";
 
 const app = express();
+
+// Initialize Database Connection
+initDatabase();
 
 // --- Middleware ---
 app.use(express.json());
@@ -36,6 +41,7 @@ app.use(authRoutes);
 app.use(chatRoutes);
 app.use(marketRoutes);
 app.use(terminalRoutes);
+app.use(historyRoutes);
 
 
 // --- Start server ---

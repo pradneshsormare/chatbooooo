@@ -1,65 +1,33 @@
-import fs from "fs";
-import path from "path";
-import { fileURLToPath } from "url";
-
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
-const dbPath = path.join(__dirname, "..", "data", "users.json");
+import pool from "./db.js";
 
 /**
- * Ensures the database directory and file exist.
+ * Find a user by their username (case insensitive).
  */
-function initDb() {
-  const dir = path.dirname(dbPath);
-  if (!fs.existsSync(dir)) {
-    fs.mkdirSync(dir, { recursive: true });
-  }
-  if (!fs.existsSync(dbPath)) {
-    fs.writeFileSync(dbPath, JSON.stringify([], null, 2), "utf8");
-  }
-}
-
-/**
- * Retrieve all users from the JSON database.
- */
-export function getUsers() {
-  initDb();
+export async function findUserByUsername(username) {
   try {
-    const data = fs.readFileSync(dbPath, "utf8");
-    return JSON.parse(data);
+    const res = await pool.query(
+      "SELECT * FROM users WHERE LOWER(username) = LOWER($1)",
+      [username.trim()]
+    );
+    return res.rows[0] || null;
   } catch (error) {
-    console.error("Error reading users database:", error);
-    return [];
+    console.error("Error finding user by username:", error);
+    throw error;
   }
 }
 
 /**
- * Save user records to the JSON database.
+ * Add a new user to the PostgreSQL database.
  */
-export function saveUsers(users) {
-  initDb();
+export async function addUser(user) {
   try {
-    fs.writeFileSync(dbPath, JSON.stringify(users, null, 2), "utf8");
+    await pool.query(
+      "INSERT INTO users (id, username, password) VALUES ($1, $2, $3)",
+      [user.id, user.username, user.password]
+    );
     return true;
   } catch (error) {
-    console.error("Error writing users database:", error);
+    console.error("Error adding user:", error);
     return false;
   }
-}
-
-/**
- * Find a user by their username.
- */
-export function findUserByUsername(username) {
-  const users = getUsers();
-  return users.find(u => u.username.toLowerCase() === username.toLowerCase());
-}
-
-/**
- * Add a new user to the JSON database.
- */
-export function addUser(user) {
-  const users = getUsers();
-  users.push(user);
-  return saveUsers(users);
 }

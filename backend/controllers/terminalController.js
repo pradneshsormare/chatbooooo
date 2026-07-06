@@ -1,6 +1,7 @@
 // terminalController.js — Handles /api/terminal-analyze endpoint
 
-import { groq, parseAnalysisRequest } from "../services/groqService.js";
+import pool from "../services/db.js";
+import { groq, parseAnalysisRequest, generateSearchSummary } from "../services/groqService.js";
 import { executeAnalysisTools, filterCandlesByTime } from "../services/analysisService.js";
 import { fetchCandles } from "../stockTools.js";
 
@@ -195,6 +196,22 @@ Give a 3-5 sentence professional analysis summary that highlights the most impor
     };
 
     console.log(`[server] Terminal analysis complete: ${analysis.chartActions.length} chart actions, ${analysis.notes.length} notes`);
+
+    // Automatically log this search to history database in the background
+    (async () => {
+      try {
+        const userId = req.user.id;
+        const summary = await generateSearchSummary(message, aiSummary);
+
+        await pool.query(
+          "INSERT INTO search_history (user_id, query, symbol, summary) VALUES ($1, $2, $3, $4)",
+          [userId, message, targetSymbol, summary]
+        );
+      } catch (historyErr) {
+        console.error("[server] Failed to record search history in terminal:", historyErr.message);
+      }
+    })();
+
     res.json(response);
 
   } catch (error) {

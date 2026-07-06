@@ -51,6 +51,11 @@ chatForm.addEventListener("submit", async (e) => {
             appendStockCard(data.stockData, botMsgEl, data.terminalTicker);
         }
 
+        // Refresh search history list to show the new item
+        if (typeof window.refreshSearchHistory === "function") {
+            window.refreshSearchHistory();
+        }
+
         // If terminal data with chart actions is available, show analysis preview
         if (data.terminalData) {
             appendAnalysisPreview(data.terminalData, botMsgEl);
@@ -408,9 +413,11 @@ window.openTerminalWithAnalysis = function(encodedData, symbol) {
     }
 };
 
-// ------------------ AUTHENTICATION & PROFILE SETUP ------------------
+// ------------------ AUTHENTICATION & PROFILE & HISTORY SETUP ------------------
 document.addEventListener("DOMContentLoaded", () => {
     const userStr = localStorage.getItem("tradebot_user");
+    const userToken = localStorage.getItem("tradebot_token");
+    
     if (userStr) {
         try {
             const user = JSON.parse(userStr);
@@ -431,4 +438,144 @@ document.addEventListener("DOMContentLoaded", () => {
             window.location.href = "index.html";
         });
     }
+
+    // --- Search History Logic ---
+    const historyToggleBtn = document.getElementById("history-toggle-btn");
+    const historySidebar = document.getElementById("history-sidebar");
+    const historyList = document.getElementById("history-list");
+    const clearHistoryBtn = document.getElementById("clear-history-btn");
+
+    if (historyToggleBtn && historySidebar) {
+        // Toggle Sidebar open/collapsed
+        historyToggleBtn.addEventListener("click", () => {
+            const isCollapsed = historySidebar.classList.toggle("collapsed");
+            historyToggleBtn.classList.toggle("active", !isCollapsed);
+            if (!isCollapsed) {
+                fetchHistory();
+            }
+        });
+
+        // Clear All History
+        if (clearHistoryBtn) {
+            clearHistoryBtn.addEventListener("click", async () => {
+                if (!confirm("Are you sure you want to clear your entire search history?")) return;
+                try {
+                    const response = await fetch("/api/history", {
+                        method: "DELETE",
+                        headers: { "Authorization": `Bearer ${userToken}` }
+                    });
+                    if (response.ok) {
+                        fetchHistory();
+                    } else {
+                        console.error("Failed to clear history");
+                    }
+                } catch (err) {
+                    console.error("Error clearing history:", err);
+                }
+            });
+        }
+
+        // Fetch History on Page Load
+        fetchHistory();
+    }
+
+    async function fetchHistory() {
+        if (!userToken) return;
+        try {
+            const response = await fetch("/api/history", {
+                headers: { "Authorization": `Bearer ${userToken}` }
+            });
+            if (response.status === 401) {
+                localStorage.removeItem("tradebot_token");
+                localStorage.removeItem("tradebot_user");
+                window.location.href = "index.html";
+                return;
+            }
+            const data = await response.json();
+            if (response.ok) {
+                renderHistory(data.history || []);
+            }
+        } catch (err) {
+            console.error("Error fetching history:", err);
+        }
+    }
+
+    function renderHistory(items) {
+        if (!historyList) return;
+        historyList.innerHTML = "";
+
+        if (items.length === 0) {
+            historyList.innerHTML = '<p class="history-empty">No search history yet.</p>';
+            return;
+        }
+
+        items.forEach(item => {
+            const card = document.createElement("div");
+            card.className = "history-card";
+            
+            // Format time relative or simple locale
+            const timeStr = new Date(item.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) + 
+                            " " + new Date(item.created_at).toLocaleDateString([], { month: 'short', day: 'numeric' });
+
+            const symbolTag = item.symbol ? `<span class="history-symbol">${item.symbol}</span>` : '';
+            
+            card.innerHTML = `
+                <div class="history-card-header">
+                    <span class="history-query">${escapeHtml(item.query)}</span>
+                    <button class="history-card-delete" data-id="${item.id}" title="Delete item">
+                        <i class="fas fa-times"></i>
+                    </button>
+                </div>
+                <p class="history-summary">${escapeHtml(item.summary || item.query)}</p>
+                <div class="history-footer">
+                    ${symbolTag}
+                    <span class="history-time">${timeStr}</span>
+                </div>
+            `;
+
+            // Click card to fill query
+            card.addEventListener("click", (e) => {
+                // If clicked delete button, don't execute load
+                if (e.target.closest(".history-card-delete")) return;
+                
+                const userInputField = document.getElementById("user-input");
+                if (userInputField) {
+                    userInputField.value = item.query;
+                    userInputField.focus();
+                }
+            });
+
+            // Delete item button handler
+            const deleteBtn = card.querySelector(".history-card-delete");
+            deleteBtn.addEventListener("click", async (e) => {
+                e.stopPropagation();
+                try {
+                    const response = await fetch(`/api/history/${item.id}`, {
+                        method: "DELETE",
+                        headers: { "Authorization": `Bearer ${userToken}` }
+                    });
+                    if (response.ok) {
+                        fetchHistory();
+                    }
+                } catch (err) {
+                    console.error("Error deleting history item:", err);
+                }
+            });
+
+            historyList.appendChild(card);
+        });
+    }
+
+    function escapeHtml(text) {
+        if (!text) return "";
+        return text
+            .replace(/&/g, "&amp;")
+            .replace(/</g, "&lt;")
+            .replace(/>/g, "&gt;")
+            .replace(/"/g, "&quot;")
+            .replace(/'/g, "&#039;");
+    }
+
+    // Expose fetchHistory globally so script.js can refresh it after submitting chat message
+    window.refreshSearchHistory = fetchHistory;
 });

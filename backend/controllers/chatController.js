@@ -1,12 +1,14 @@
 // chatController.js — Handles /api/chat endpoint
 
+import pool from "../services/db.js";
 import {
   groq,
   SYSTEM_INSTRUCTION,
   getChatHistory,
   setChatHistory,
   detectStockIntent,
-  parseAnalysisRequest
+  parseAnalysisRequest,
+  generateSearchSummary
 } from "../services/groqService.js";
 import { fetchStockData } from "../services/marketDataService.js";
 import { executeAnalysisTools } from "../services/analysisService.js";
@@ -255,6 +257,22 @@ CRITICAL RULES:
     if (terminalData) {
       responsePayload.terminalData = terminalData;
     }
+
+    // Automatically log this search to history database in the background
+    (async () => {
+      try {
+        const userId = req.user.id;
+        const symbol = (stockData && stockData.ticker) ? stockData.ticker : (intent.hasStock ? intent.ticker : null);
+        const summary = await generateSearchSummary(userMessage, reply);
+        
+        await pool.query(
+          "INSERT INTO search_history (user_id, query, symbol, summary) VALUES ($1, $2, $3, $4)",
+          [userId, userMessage, symbol, summary]
+        );
+      } catch (historyErr) {
+        console.error("[server] Failed to record search history:", historyErr.message);
+      }
+    })();
 
     res.json(responsePayload);
   } catch (error) {

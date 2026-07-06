@@ -9,7 +9,7 @@ const router = Router();
  * @route   POST /api/auth/register
  * @desc    Register a new user
  */
-router.post("/api/auth/register", (req, res) => {
+router.post("/api/auth/register", async (req, res) => {
   try {
     const { username, password } = req.body;
 
@@ -26,7 +26,7 @@ router.post("/api/auth/register", (req, res) => {
       return res.status(400).json({ error: "Password must be at least 6 characters long." });
     }
 
-    const existingUser = findUserByUsername(trimmedUsername);
+    const existingUser = await findUserByUsername(trimmedUsername);
     if (existingUser) {
       return res.status(409).json({ error: "Username is already taken." });
     }
@@ -34,11 +34,10 @@ router.post("/api/auth/register", (req, res) => {
     const newUser = {
       id: Date.now().toString(),
       username: trimmedUsername,
-      password: hashPassword(password),
-      createdAt: new Date().toISOString()
+      password: hashPassword(password)
     };
 
-    const success = addUser(newUser);
+    const success = await addUser(newUser);
     if (!success) {
       return res.status(500).json({ error: "Failed to create user account. Try again later." });
     }
@@ -57,7 +56,7 @@ router.post("/api/auth/register", (req, res) => {
  * @route   POST /api/auth/login
  * @desc    Authenticate user and return token
  */
-router.post("/api/auth/login", (req, res) => {
+router.post("/api/auth/login", async (req, res) => {
   try {
     const { username, password } = req.body;
 
@@ -65,7 +64,7 @@ router.post("/api/auth/login", (req, res) => {
       return res.status(400).json({ error: "Username and password are required." });
     }
 
-    const user = findUserByUsername(username.trim());
+    const user = await findUserByUsername(username.trim());
     if (!user || !verifyPassword(password, user.password)) {
       return res.status(401).json({ error: "Invalid username or password." });
     }
