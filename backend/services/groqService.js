@@ -3,7 +3,7 @@
 import Groq from "groq-sdk";
 
 const groq = new Groq({
-  apiKey: process.env.GROQ_API_KEY,
+  apiKey: process.env.GROQ_API_KEY || "gsk_placeholder_api_key_to_prevent_vercel_crash",
 });
 
 const SYSTEM_INSTRUCTION =
