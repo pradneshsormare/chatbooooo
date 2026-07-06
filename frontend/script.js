@@ -1,3 +1,9 @@
+// Check authentication before loading anything
+const token = localStorage.getItem("tradebot_token");
+if (!token) {
+    window.location.href = "index.html";
+}
+
 // ------------------ DOM ELEMENTS ------------------
 const chatForm = document.getElementById("chat-form");
 const userInput = document.getElementById("user-input");
@@ -17,9 +23,19 @@ chatForm.addEventListener("submit", async (e) => {
     try {
         const response = await fetch("/api/chat", {
             method: "POST",
-            headers: { "Content-Type": "application/json" },
+            headers: { 
+                "Content-Type": "application/json",
+                "Authorization": `Bearer ${token}`
+            },
             body: JSON.stringify({ message: userProblem }),
         });
+
+        if (response.status === 401) {
+            localStorage.removeItem("tradebot_token");
+            localStorage.removeItem("tradebot_user");
+            window.location.href = "index.html";
+            return;
+        }
 
         if (!response.ok) {
             throw new Error(`Server responded with ${response.status}`);
@@ -64,6 +80,49 @@ chatForm.addEventListener("submit", async (e) => {
 
 // ------------------ HELPER FUNCTIONS ------------------
 /**
+ * Dynamic financial text highlights and formatting.
+ * Shows profit/green, losses/red, and digits/sky-blue mono.
+ */
+function highlightFinancialData(text) {
+    // Escape HTML to prevent injection
+    let escaped = text
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;");
+
+    // Define pattern components:
+    const profitKeywords = '\\b(?:profit|profits|gain|gains|bullish|upward|upwards|surged|surges|positive|growth|green|long)\\b';
+    const lossKeywords = '\\b(?:loss|losses|lose|drop|drops|bearish|downward|downwards|slump|slumps|negative|decline|red|short)\\b';
+    const signedNumbers = '[+-]\\s*(?:₹|Rs\\.?|\\$)?\\s*\\d+(?:,\\d+)*(?:\\.\\d+)?\\s*%?';
+    const currencyFigures = '(?:₹|Rs\\.?|\\$)\\s*\\d+(?:,\\d+)*(?:\\.\\d+)?';
+    const standaloneDigits = '\\b(?!(?:19[789]\\d|20[0123456789]\\d)\\b)\\d+(?:,\\d+)*(?:\\.\\d+)?%?\\b';
+
+    const masterRegex = new RegExp(
+        `(${profitKeywords})|(${lossKeywords})|(${signedNumbers})|(${currencyFigures})|(${standaloneDigits})`,
+        'gi'
+    );
+
+    return escaped.replace(masterRegex, (match, p1, p2, p3, p4, p5) => {
+        if (p1) {
+            return `<span class="profit-highlight">${match}</span>`;
+        } else if (p2) {
+            return `<span class="loss-highlight">${match}</span>`;
+        } else if (p3) {
+            const clean = match.trim();
+            if (clean.startsWith('+')) {
+                return `<span class="profit-highlight">${match}</span>`;
+            } else if (clean.startsWith('-')) {
+                return `<span class="loss-highlight">${match}</span>`;
+            }
+            return `<span class="digit-highlight">${match}</span>`;
+        } else if (p4 || p5) {
+            return `<span class="digit-highlight">${match}</span>`;
+        }
+        return match;
+    });
+}
+
+/**
  * Cleans and formats text, then adds it to the chat interface.
  */
 function addMessage(text, sender, isLoading = false) {
@@ -82,19 +141,69 @@ function addMessage(text, sender, isLoading = false) {
             .replace(/\*/g, '')
             .trim();
 
-        const paragraphs = cleanText.split('\n').filter(p => p.trim() !== '');
+        const rawLines = cleanText.split('\n');
+        let currentListItems = [];
 
-        if (paragraphs.length === 0) {
-            const p = document.createElement('p');
-            p.textContent = cleanText;
-            messageElement.appendChild(p);
-        } else {
-            paragraphs.forEach(paraText => {
+        const appendCurrentList = () => {
+            if (currentListItems.length > 0) {
+                const details = document.createElement('details');
+                details.className = 'analysis-details-collapse';
+
+                const summary = document.createElement('summary');
+                summary.className = 'analysis-details-summary';
+
+                const count = currentListItems.length;
+                summary.innerHTML = `<i class="fa-solid fa-wand-magic-sparkles"></i> View Detected Patterns (${count} found)`;
+                details.appendChild(summary);
+
+                const listContainer = document.createElement('div');
+                listContainer.className = 'analysis-details-content';
+
+                currentListItems.forEach(itemText => {
+                    const itemEl = document.createElement('div');
+                    itemEl.className = 'analysis-list-item';
+
+                    let iconHtml = '<i class="fa-solid fa-circle-dot text-neutral"></i>';
+                    const lowerText = itemText.toLowerCase();
+                    if (lowerText.includes('bullish') || lowerText.includes('hammer') || lowerText.includes('morning star') || lowerText.includes('soldiers') || lowerText.includes('marubozu bullish')) {
+                        iconHtml = '<i class="fa-solid fa-circle-chevron-up text-success"></i>';
+                    } else if (lowerText.includes('bearish') || lowerText.includes('shooting star') || lowerText.includes('evening star') || lowerText.includes('crows') || lowerText.includes('marubozu bearish')) {
+                        iconHtml = '<i class="fa-solid fa-circle-chevron-down text-danger"></i>';
+                    }
+
+                    const cleanedItem = itemText.replace(/^-\s*/, '');
+                    itemEl.innerHTML = `${iconHtml} <span>${highlightFinancialData(cleanedItem)}</span>`;
+                    listContainer.appendChild(itemEl);
+                });
+
+                details.appendChild(listContainer);
+                messageElement.appendChild(details);
+                currentListItems = [];
+            }
+        };
+
+        rawLines.forEach(line => {
+            const trimmedLine = line.trim();
+            if (!trimmedLine) return;
+
+            if (trimmedLine.startsWith('-')) {
+                currentListItems.push(trimmedLine);
+            } else {
+                appendCurrentList();
+
                 const p = document.createElement('p');
-                p.textContent = paraText;
+                if (trimmedLine.startsWith('###') || trimmedLine.startsWith('##') || trimmedLine.startsWith('#')) {
+                    const headingText = trimmedLine.replace(/^#+\s*/, '');
+                    p.className = 'analysis-section-heading';
+                    p.innerHTML = `<i class="fa-solid fa-circle-nodes"></i> ${highlightFinancialData(headingText)}`;
+                } else {
+                    p.innerHTML = highlightFinancialData(trimmedLine);
+                }
                 messageElement.appendChild(p);
-            });
-        }
+            }
+        });
+
+        appendCurrentList();
     } else {
         const p = document.createElement("p");
         p.textContent = text;
@@ -298,3 +407,28 @@ window.openTerminalWithAnalysis = function(encodedData, symbol) {
         window.open(`terminal.html?symbol=${encodeURIComponent(symbol)}`, "_blank");
     }
 };
+
+// ------------------ AUTHENTICATION & PROFILE SETUP ------------------
+document.addEventListener("DOMContentLoaded", () => {
+    const userStr = localStorage.getItem("tradebot_user");
+    if (userStr) {
+        try {
+            const user = JSON.parse(userStr);
+            const userDisplayName = document.getElementById("user-display-name");
+            if (userDisplayName) {
+                userDisplayName.innerHTML = `<i class="fas fa-user-circle"></i> ${user.username}`;
+            }
+        } catch (e) {
+            console.error("Error parsing user info:", e);
+        }
+    }
+
+    const logoutBtn = document.getElementById("logout-btn");
+    if (logoutBtn) {
+        logoutBtn.addEventListener("click", () => {
+            localStorage.removeItem("tradebot_token");
+            localStorage.removeItem("tradebot_user");
+            window.location.href = "index.html";
+        });
+    }
+});

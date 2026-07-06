@@ -3,55 +3,73 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>TradeBot AI</title>
-    <!-- Google Fonts Import -->
+    <title>TradeBot AI - Login / Register</title>
+    <!-- Google Fonts -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600&display=swap" rel="stylesheet">
-    <!-- Font Awesome Icons -->
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <!-- Font Awesome -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-    <!-- Stylesheet -->
     <link rel="stylesheet" href="style.css">
-    <!-- Chart.js -->
-    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 </head>
-<body>
-
-    <header class="navbar">
-        <div class="logo">
-            <i class="fas fa-chart-line"></i>
-            <span>TradeBot AI</span>
-        </div>
-        <div style="display: flex; gap: 0.5rem; align-items: center;">
-            <a href="terminal.html?symbol=RELIANCE.NS" class="nav-button"><i class="fas fa-chart-bar"></i> Terminal</a>
-            <a href="quiz.html" class="nav-button">Practice Quiz</a>
-        </div>
-    </header>
-
-    <main class="chat-container">
-        <div id="chat-messages">
-            <div class="message bot-message">
-                <p>Hello! I'm TradeBot. How can I help you with the Indian share market, stocks, or SIPs today?</p>
+<body class="auth-body">
+    <div class="auth-wrapper">
+        <div class="auth-card">
+            <div class="auth-header">
+                <i class="fas fa-chart-line logo-icon"></i>
+                <h1>TradeBot AI</h1>
+                <p>Your Indian Share Market Guide</p>
             </div>
+            
+            <!-- Login Form -->
+            <form id="login-form" class="auth-form">
+                <h2>Welcome Back</h2>
+                <div id="login-error" class="auth-alert error hidden"></div>
+                <div id="login-success" class="auth-alert success hidden"></div>
+                
+                <div class="form-group">
+                    <label for="login-username"><i class="fas fa-user"></i> Username</label>
+                    <input type="text" id="login-username" placeholder="Enter username" required autocomplete="username">
+                </div>
+                
+                <div class="form-group">
+                    <label for="login-password"><i class="fas fa-lock"></i> Password</label>
+                    <input type="password" id="login-password" placeholder="Enter password" required autocomplete="current-password">
+                </div>
+                
+                <button type="submit" class="auth-btn btn-primary">Login</button>
+                
+                <p class="auth-toggle">New to TradeBot? <span id="to-register">Register here</span></p>
+            </form>
+
+            <!-- Register Form -->
+            <form id="register-form" class="auth-form hidden">
+                <h2>Create Account</h2>
+                <div id="register-error" class="auth-alert error hidden"></div>
+                <div id="register-success" class="auth-alert success hidden"></div>
+                
+                <div class="form-group">
+                    <label for="register-username"><i class="fas fa-user"></i> Username</label>
+                    <input type="text" id="register-username" placeholder="Choose a username" required autocomplete="username">
+                </div>
+
+                <div class="form-group">
+                    <label for="register-password"><i class="fas fa-lock"></i> Password</label>
+                    <input type="password" id="register-password" placeholder="Choose a password" required autocomplete="new-password">
+                </div>
+
+                <div class="form-group">
+                    <label for="register-confirm-password"><i class="fas fa-check-double"></i> Confirm Password</label>
+                    <input type="password" id="register-confirm-password" placeholder="Confirm your password" required autocomplete="new-password">
+                </div>
+                
+                <button type="submit" class="auth-btn btn-primary">Register</button>
+                
+                <p class="auth-toggle">Already have an account? <span id="to-login">Login here</span></p>
+            </form>
         </div>
-        
-        <form id="chat-form">
-            <input 
-                type="text" 
-                id="user-input" 
-                placeholder="Ask me anything..."
-                autocomplete="off"
-                required
-            >
-            <!-- Updated Button with SVG Icon -->
-            <button type="submit" aria-label="Send Message">
-                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor">
-                    <path d="M3.478 2.405a.75.75 0 00-.926.94l2.432 7.905H13.5a.75.75 0 010 1.5H4.984l-2.432 7.905a.75.75 0 00.926.94 60.519 60.519 0 0018.445-8.986.75.75 0 000-1.218A60.517 60.517 0 003.478 2.405z" />
-                </svg>
-            </button>
-        </form>
-    </main>
-    
-    <script type="module" src="script.js"></script>
+    </div>
+
+    <script src="auth.js"></script>
 </body>
 </html>

@@ -4,6 +4,68 @@ import { groq, parseAnalysisRequest } from "../services/groqService.js";
 import { executeAnalysisTools, filterCandlesByTime } from "../services/analysisService.js";
 import { fetchCandles } from "../stockTools.js";
 
+function refersToSelection(command) {
+  return /selected|marked|this area|this region|inside this|selection|highlighted|selection range/i.test(command);
+}
+
+function determineAnalysisScope(command, selection) {
+  if (refersToSelection(command) && selection) {
+    return "selected_region";
+  }
+  if (/this candle|selected candle/i.test(command)) {
+    return "single_candle";
+  }
+  if (/last|day|week|month|hour/i.test(command)) {
+    return "full_period";
+  }
+  return selection ? "selected_region" : "visible_chart";
+}
+
+function getSelectedCandles(candles, selection) {
+  if (!selection?.startTime || !selection?.endTime) {
+    return [];
+  }
+
+  let startVal = selection.startTime;
+  let endVal = selection.endTime;
+
+  // Convert to numeric timestamps if they are strings
+  let startNum = typeof startVal === 'string' && startVal.includes('-')
+    ? new Date(startVal + 'T00:00:00').getTime() / 1000
+    : Number(startVal);
+
+  let endNum = typeof endVal === 'string' && endVal.includes('-')
+    ? new Date(endVal + 'T00:00:00').getTime() / 1000
+    : Number(endVal);
+
+  const start = Math.min(startNum, endNum);
+  const end = Math.max(startNum, endNum);
+
+  return candles.filter(candle => {
+    let candleTime = typeof candle.date === 'string' && candle.date.includes('-')
+      ? Math.floor(new Date(candle.date + 'T00:00:00').getTime() / 1000)
+      : (typeof candle.date === 'number' ? candle.date : Number(candle.date));
+
+    return candleTime >= start && candleTime <= end;
+  });
+}
+
+function determineFetchRange(startDateStr) {
+  if (!startDateStr) return "3mo";
+  try {
+    const start = new Date(startDateStr);
+    const diffDays = Math.ceil((new Date() - start) / (1000 * 60 * 60 * 24));
+    if (diffDays <= 30) return "1mo";
+    if (diffDays <= 90) return "3mo";
+    if (diffDays <= 180) return "6mo";
+    if (diffDays <= 365) return "1y";
+    if (diffDays <= 365 * 2) return "2y";
+    return "max";
+  } catch (e) {
+    return "3mo";
+  }
+}
+
 export async function analyzeTerminal(req, res) {
   try {
     const { message, symbol, interval, selectedRange, candles: clientCandles } = req.body;
@@ -29,34 +91,70 @@ export async function analyzeTerminal(req, res) {
     const targetSymbol = parsed.symbol || effectiveSymbol;
 
     // Step 3: Get candle data
+    const scope = determineAnalysisScope(message, selectedRange);
+    console.log(`[server] Determined analysis scope: ${scope}`);
+
     let candles;
-    if (selectedRange && selectedRange.candles && selectedRange.candles.length >= 3) {
-      // Use the user's selected range candles
-      candles = selectedRange.candles;
-      console.log(`[server] Using ${candles.length} selected candles`);
-    } else {
-      // Fetch candle data for the requested period
-      let range = "1mo";
-      let fetchInterval = effectiveInterval;
+    let allCandles = [];
+    let range = "3mo";
+    let fetchInterval = effectiveInterval;
 
-      // If time period was specified, use intraday data
-      if (parsed.startTime || parsed.endTime) {
-        range = "1d";
-        fetchInterval = parsed.interval || "5m";
+    if (parsed.startDate) {
+      range = determineFetchRange(parsed.startDate);
+    } else if (parsed.startTime || parsed.endTime) {
+      range = "1d";
+      fetchInterval = parsed.interval || "5m";
+    }
+
+    try {
+      allCandles = await fetchCandles(targetSymbol, range, fetchInterval);
+    } catch (e) {
+      console.warn("[server] Pre-fetching all candles failed:", e.message);
+    }
+
+    if (scope === "selected_region" && selectedRange) {
+      if (allCandles.length > 0) {
+        candles = getSelectedCandles(allCandles, selectedRange);
       }
-
-      candles = await fetchCandles(targetSymbol, range, fetchInterval);
-
-      // Filter by time if specified
+      if (!candles || candles.length < 3) {
+        candles = (selectedRange.candles || []).map(c => ({
+          date: c.date || c.time,
+          open: c.open,
+          high: c.high,
+          low: c.low,
+          close: c.close,
+          volume: c.volume
+        }));
+      }
+      console.log(`[server] Using ${candles?.length || 0} selected candles`);
+    } else {
+      candles = allCandles;
+      if (parsed.startDate || parsed.endDate) {
+        const startLimit = parsed.startDate ? parsed.startDate : null;
+        const endLimit = parsed.endDate ? parsed.endDate : null;
+        candles = candles.filter(c => {
+          let keep = true;
+          if (startLimit) keep = keep && c.date >= startLimit;
+          if (endLimit) keep = keep && c.date <= endLimit;
+          return keep;
+        });
+      }
       if (parsed.startTime || parsed.endTime) {
         candles = filterCandlesByTime(candles, parsed.startTime, parsed.endTime, parsed.date);
       }
-
-      console.log(`[server] Fetched ${candles.length} candles for ${targetSymbol}`);
+      console.log(`[server] Using ${candles?.length || 0} candles for scope: ${scope}`);
     }
 
     // Step 4: Execute analysis tools
     const analysis = await executeAnalysisTools(parsed, candles, targetSymbol);
+
+    if (parsed.startDate && parsed.endDate && candles.length > 0) {
+      analysis.chartActions.push({
+        type: "SET_VISIBLE_RANGE",
+        startDate: parsed.startDate,
+        endDate: parsed.endDate
+      });
+    }
 
     // Step 5: Generate AI text summary using Groq
     let aiSummary = analysis.message;

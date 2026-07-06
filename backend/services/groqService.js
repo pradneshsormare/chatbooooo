@@ -59,7 +59,7 @@ async function detectStockIntent(message) {
 
 /**
  * Parse a terminal analysis request using Groq.
- * Extracts: symbol, date, startTime, endTime, interval, analysisType.
+ * Extracts: symbol, startDate, endDate, date, startTime, endTime, interval, analysisType.
  */
 async function parseAnalysisRequest(message, context) {
   try {
@@ -73,7 +73,9 @@ Context:
 Extract the following in JSON format:
 {
   "symbol": "stock symbol if mentioned, null otherwise",
-  "date": "date if mentioned (YYYY-MM-DD format), null otherwise",
+  "startDate": "start date of date range if mentioned (YYYY-MM-DD format), null otherwise",
+  "endDate": "end date of date range if mentioned (YYYY-MM-DD format), null otherwise",
+  "date": "single date if mentioned (YYYY-MM-DD format), null otherwise",
   "startTime": "start time if mentioned (HH:MM 24-hour format), null otherwise",
   "endTime": "end time if mentioned (HH:MM 24-hour format), null otherwise",
   "interval": "candle interval if mentioned (e.g. 5m, 15m, 1h, 1d), null otherwise",
@@ -95,7 +97,7 @@ Rules:
 - If the user mentions momentum or RSI, set needsMomentum=true
 - If the user mentions volume, set needsVolume=true
 - For time parsing: "10 AM" → "10:00", "1:30 PM" → "13:30", "9:30 AM" → "09:30"
-- If the user mentions a stock name (e.g., "TCS", "Reliance"), resolve to Yahoo Finance symbol with .NS suffix for Indian stocks
+- If the user mentions a stock name (e.g., "TCS", "Reliance", "Tata Steel"), resolve to Yahoo Finance symbol with .NS suffix for Indian stocks (e.g. "TATASTEEL.NS", "RELIANCE.NS", "TCS.NS")
 
 Return ONLY valid JSON.`;
 

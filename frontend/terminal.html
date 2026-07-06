@@ -19,13 +19,16 @@
 
     <!-- ===== NAVBAR ===== -->
     <nav class="terminal-navbar">
-        <a href="index.html" class="terminal-logo">
+        <div class="terminal-logo">
             <i class="fas fa-chart-line"></i>
             <span>TradeBot Terminal</span>
-        </a>
-        <div class="terminal-nav-links">
-            <a href="index.html" class="terminal-nav-btn"><i class="fas fa-comments"></i> Chat</a>
-            <a href="quiz.html" class="terminal-nav-btn"><i class="fas fa-brain"></i> Quiz</a>
+        </div>
+        <div class="terminal-nav-links" style="display: flex; align-items: center; gap: 1rem;">
+            <a href="chat.html" class="terminal-nav-btn"><i class="fas fa-comments"></i> Chat</a>
+            <div id="user-profile" class="user-profile-menu">
+                <span id="user-display-name"><i class="fas fa-user-circle"></i> Loading...</span>
+                <button id="logout-btn" class="logout-btn"><i class="fas fa-sign-out-alt"></i> Logout</button>
+            </div>
         </div>
     </nav>
 
@@ -64,58 +67,64 @@
 
         <!-- LEFT: Drawing Toolbar -->
         <div class="chart-toolbar" id="chart-toolbar">
-            <div class="toolbar-group">
-                <button class="tool-btn active" data-tool="pointer" title="Pointer (V)">
-                    <i class="fas fa-mouse-pointer"></i>
-                </button>
-                <button class="tool-btn" data-tool="crosshair" title="Crosshair (+)">
-                    <i class="fas fa-crosshairs"></i>
-                </button>
+            <div class="toolbar-header">
+                <i class="fas fa-toolbox" title="Drawing Tools"></i>
+                <span>Tools</span>
             </div>
-            <div class="toolbar-divider"></div>
-            <div class="toolbar-group">
-                <button class="tool-btn" data-tool="rectangle" title="Rectangle Selection (R)">
-                    <i class="far fa-square"></i>
-                </button>
-                <button class="tool-btn ai-tool-btn" data-tool="ai-analyze" title="AI Area Analysis (A)">
-                    <i class="fas fa-wand-magic-sparkles"></i>
-                </button>
-            </div>
-            <div class="toolbar-divider"></div>
-            <div class="toolbar-group">
-                <button class="tool-btn" data-tool="trendline" title="Trend Line (T)">
-                    <i class="fas fa-chart-line"></i>
-                </button>
-                <button class="tool-btn" data-tool="hline" title="Horizontal Line (H)">
-                    <i class="fas fa-grip-lines"></i>
-                </button>
-                <button class="tool-btn" data-tool="fibonacci" title="Fibonacci Retracement (F)">
-                    <i class="fas fa-wave-square"></i>
-                </button>
-            </div>
-            <div class="toolbar-divider"></div>
-            <div class="toolbar-group">
-                <button class="tool-btn" id="zoom-in-btn" title="Zoom In">
-                    <i class="fas fa-magnifying-glass-plus"></i>
-                </button>
-                <button class="tool-btn" id="zoom-out-btn" title="Zoom Out">
-                    <i class="fas fa-magnifying-glass-minus"></i>
-                </button>
-                <button class="tool-btn" id="fit-chart-btn" title="Fit Chart">
-                    <i class="fas fa-expand"></i>
-                </button>
-                <button class="tool-btn" id="reset-chart-btn" title="Reset Chart">
-                    <i class="fas fa-rotate-left"></i>
-                </button>
-            </div>
-            <div class="toolbar-divider"></div>
-            <div class="toolbar-group">
-                <button class="tool-btn danger-btn" id="delete-drawing-btn" title="Delete Selected (Del)">
-                    <i class="fas fa-eraser"></i>
-                </button>
-                <button class="tool-btn danger-btn" id="clear-all-btn" title="Clear All Drawings">
-                    <i class="fas fa-trash-can"></i>
-                </button>
+            <div class="toolbar-scrollable-area">
+                <div class="toolbar-group">
+                    <button class="tool-btn active" data-tool="pointer" title="Pointer (V)">
+                        <i class="fas fa-mouse-pointer"></i>
+                    </button>
+                    <button class="tool-btn" data-tool="crosshair" title="Crosshair (+)">
+                        <i class="fas fa-crosshairs"></i>
+                    </button>
+                </div>
+                <div class="toolbar-divider"></div>
+                <div class="toolbar-group">
+                    <button class="tool-btn" data-tool="rectangle" title="Rectangle Selection (R)">
+                        <i class="far fa-square"></i>
+                    </button>
+                    <button class="tool-btn ai-tool-btn" data-tool="ai-analyze" title="AI Area Analysis (A)">
+                        <i class="fas fa-wand-magic-sparkles"></i>
+                    </button>
+                </div>
+                <div class="toolbar-divider"></div>
+                <div class="toolbar-group">
+                    <button class="tool-btn" data-tool="trendline" title="Trend Line (T)">
+                        <i class="fas fa-chart-line"></i>
+                    </button>
+                    <button class="tool-btn" data-tool="hline" title="Horizontal Line (H)">
+                        <i class="fas fa-grip-lines"></i>
+                    </button>
+                    <button class="tool-btn" data-tool="fibonacci" title="Fibonacci Retracement (F)">
+                        <i class="fas fa-wave-square"></i>
+                    </button>
+                </div>
+                <div class="toolbar-divider"></div>
+                <div class="toolbar-group">
+                    <button class="tool-btn" id="zoom-in-btn" title="Zoom In">
+                        <i class="fas fa-magnifying-glass-plus"></i>
+                    </button>
+                    <button class="tool-btn" id="zoom-out-btn" title="Zoom Out">
+                        <i class="fas fa-magnifying-glass-minus"></i>
+                    </button>
+                    <button class="tool-btn" id="fit-chart-btn" title="Fit Chart">
+                        <i class="fas fa-expand"></i>
+                    </button>
+                    <button class="tool-btn" id="reset-chart-btn" title="Reset Chart">
+                        <i class="fas fa-rotate-left"></i>
+                    </button>
+                </div>
+                <div class="toolbar-divider"></div>
+                <div class="toolbar-group">
+                    <button class="tool-btn danger-btn" id="delete-drawing-btn" title="Delete Selected (Del)">
+                        <i class="fas fa-eraser"></i>
+                    </button>
+                    <button class="tool-btn danger-btn" id="clear-all-btn" title="Clear All Drawings">
+                        <i class="fas fa-trash-can"></i>
+                    </button>
+                </div>
             </div>
         </div>
 
@@ -153,40 +162,31 @@
                 </div>
             </div>
 
-            <!-- Terminal Chat Input -->
-            <div class="terminal-chat-bar">
-                <form id="terminal-chat-form">
-                    <div class="terminal-chat-input-wrap">
-                        <i class="fas fa-wand-magic-sparkles"></i>
-                        <input
-                            type="text"
-                            id="terminal-chat-input"
-                            placeholder="Ask AI: 'Analyse from 10 AM to 2 PM' or 'Show trend in this area'..."
-                            autocomplete="off"
-                        >
-                        <button type="submit" title="Send">
-                            <i class="fas fa-paper-plane"></i>
-                        </button>
-                    </div>
-                </form>
-            </div>
         </div>
 
-        <!-- RIGHT: AI Notes Panel -->
+        <!-- RIGHT: AI Assistant Panel -->
+        <!-- Floating AI Panel Toggle Button (always visible) -->
+        <button class="ai-panel-toggle-fab" id="ai-panel-toggle-fab" title="Toggle AI Assistant Panel">
+            <i class="fas fa-wand-magic-sparkles"></i>
+        </button>
+
         <div class="ai-notes-panel" id="ai-notes-panel">
+            <!-- Resize handle for dragging -->
+            <div class="resize-handle" id="panel-resize-handle"></div>
+
             <div class="notes-panel-header">
                 <div class="notes-title">
-                    <i class="fas fa-brain"></i>
-                    <span>AI Analysis</span>
+                    <i class="fas fa-wand-magic-sparkles"></i>
+                    <span>AI Assistant</span>
                 </div>
-                <button class="notes-toggle-btn" id="notes-toggle-btn" title="Toggle Notes">
+                <button class="notes-toggle-btn" id="notes-toggle-btn" title="Close Panel">
                     <i class="fas fa-chevron-right"></i>
                 </button>
             </div>
 
-            <!-- AI Summary -->
+            <!-- AI Summary / Responses -->
             <div class="ai-summary-section" id="ai-summary-section">
-                <p class="ai-summary-placeholder">Select an area or type a command to start analysis.</p>
+                <p class="ai-summary-placeholder">Select an area or type a command below to start analysis.</p>
             </div>
 
             <!-- Analysis Tags -->
@@ -197,6 +197,23 @@
             <!-- Notes List -->
             <div class="notes-list" id="notes-list">
                 <!-- Filled dynamically with clickable note cards -->
+            </div>
+
+            <!-- Integrated Chat Form -->
+            <div class="panel-chat-container">
+                <form id="terminal-chat-form" class="panel-chat-form">
+                    <div class="panel-chat-input-wrap">
+                        <input
+                            type="text"
+                            id="terminal-chat-input"
+                            placeholder="Ask AI or type command..."
+                            autocomplete="off"
+                        >
+                        <button type="submit" title="Send">
+                            <i class="fas fa-paper-plane"></i>
+                        </button>
+                    </div>
+                </form>
             </div>
         </div>
     </div>

@@ -1,3 +1,9 @@
+// Check authentication before loading anything
+const token = localStorage.getItem("tradebot_token");
+if (!token) {
+    window.location.href = "index.html";
+}
+
 // ============================================================
 // terminal.js — AI-Controlled Interactive Trading Terminal
 // TradingView Lightweight Charts + Drawing Tools + AI Analysis
@@ -12,6 +18,7 @@ let currentRange = "1mo";
 let currentInterval = "1d";
 let currentCandleData = []; // All loaded candles (raw)
 let currentTool = "pointer";
+let showPatterns = false; // Controls pattern marker visibility
 
 // Drawing state
 let drawings = {
@@ -20,6 +27,7 @@ let drawings = {
     fibLevels: [],    // { priceLines[] }
     highlights: []    // { series }
 };
+let drawingHistory = [];
 
 // Rectangle selection state
 let selectionState = {
@@ -67,6 +75,8 @@ const analysisTags = document.getElementById("analysis-tags");
 const notesToggleBtn = document.getElementById("notes-toggle-btn");
 const notesPanel = document.getElementById("ai-notes-panel");
 const patternPopup = document.getElementById("pattern-popup");
+const aiPanelToggleFab = document.getElementById("ai-panel-toggle-fab");
+const panelResizeHandle = document.getElementById("panel-resize-handle");
 
 // -------------------- INIT --------------------
 function init() {
@@ -86,6 +96,7 @@ function init() {
     // Check if analysis data was passed via sessionStorage
     const storedAnalysis = sessionStorage.getItem("terminalAnalysis");
     if (storedAnalysis) {
+        showPatterns = true;
         sessionStorage.removeItem("terminalAnalysis");
         try {
             const data = JSON.parse(storedAnalysis);
@@ -98,6 +109,29 @@ function init() {
         } catch (e) {
             console.warn("[terminal] Failed to parse stored analysis:", e);
         }
+    }
+
+    // Auth profile display and logout handler
+    const userStr = localStorage.getItem("tradebot_user");
+    if (userStr) {
+        try {
+            const user = JSON.parse(userStr);
+            const userDisplayName = document.getElementById("user-display-name");
+            if (userDisplayName) {
+                userDisplayName.innerHTML = `<i class="fas fa-user-circle"></i> ${user.username}`;
+            }
+        } catch (e) {
+            console.error("Error parsing user info:", e);
+        }
+    }
+
+    const logoutBtn = document.getElementById("logout-btn");
+    if (logoutBtn) {
+        logoutBtn.addEventListener("click", () => {
+            localStorage.removeItem("tradebot_token");
+            localStorage.removeItem("tradebot_user");
+            window.location.href = "index.html";
+        });
     }
 }
 
@@ -186,8 +220,9 @@ function createChart() {
     });
     resizeObserver.observe(chartContainer);
 
-    // Subscribe to crosshair move for coordinate tracking
+    // Subscribe to crosshair move and clicks for coordinate tracking
     chart.subscribeCrosshairMove(handleCrosshairMove);
+    chart.subscribeClick(handleChartClick);
 }
 
 // -------------------- DATA FETCHING --------------------
@@ -199,7 +234,19 @@ async function loadData(symbol, range, interval) {
         const url = `/api/candles?symbol=${encodeURIComponent(symbol)}&range=${range}&interval=${interval}`;
         console.log(`[terminal] Fetching: ${url}`);
 
-        const response = await fetch(url);
+        const response = await fetch(url, {
+            headers: {
+                "Authorization": `Bearer ${token}`
+            }
+        });
+
+        if (response.status === 401) {
+            localStorage.removeItem("tradebot_token");
+            localStorage.removeItem("tradebot_user");
+            window.location.href = "index.html";
+            return;
+        }
+
         if (!response.ok) {
             const err = await response.json().catch(() => ({}));
             throw new Error(err.error || `Server returned ${response.status}`);
@@ -244,25 +291,24 @@ function renderChart(data) {
         }))
     );
 
-    // Place markers for detected patterns (limit to last 20)
+    // Place markers for detected patterns across the entire graph (shown only in analysis mode)
     const markers = [];
-    const patternCandles = candles.filter(c => c.pattern);
-    const recentPatterns = patternCandles.slice(-20);
+    if (showPatterns) {
+        candles.forEach(c => {
+            if (c.pattern) {
+                const isBullish = c.signal === "bullish";
+                const isBearish = c.signal === "bearish";
 
-    candles.forEach(c => {
-        if (c.pattern && recentPatterns.includes(c)) {
-            const isBullish = c.signal === "bullish";
-            const isBearish = c.signal === "bearish";
-
-            markers.push({
-                time: c.time,
-                position: isBullish ? "belowBar" : "aboveBar",
-                color: isBullish ? "#10B981" : isBearish ? "#F43F5E" : "#FBBF24",
-                shape: isBullish ? "arrowUp" : isBearish ? "arrowDown" : "circle",
-                text: c.pattern,
-            });
-        }
-    });
+                markers.push({
+                    time: c.time,
+                    position: isBullish ? "belowBar" : "aboveBar",
+                    color: isBullish ? "#10B981" : isBearish ? "#F43F5E" : "#FBBF24",
+                    shape: isBullish ? "arrowUp" : isBearish ? "arrowDown" : "circle",
+                    text: c.pattern,
+                });
+            }
+        });
+    }
 
     candlestickSeries.setMarkers(markers);
 
@@ -332,15 +378,32 @@ function executeChartActions(actions) {
             case "DRAW_RESISTANCE":
                 drawResistanceLine(action.price, action.strength);
                 break;
+            case "DRAW_STRUCTURE_LABELS":
+                drawStructureLabels(action.labels);
+                break;
+            case "SET_VISIBLE_RANGE":
+                setVisibleRange(action.startDate, action.endDate);
+                break;
             case "ADD_PATTERN_MARKER":
                 // Pattern markers are handled through chart markers in renderChart
-                // but we also store for popup access
                 break;
             case "ADD_NOTE":
                 aiNotes.push(action);
                 break;
         }
     });
+}
+
+function setVisibleRange(start, end) {
+    if (!chart || !start || !end) return;
+    try {
+        chart.timeScale().setVisibleRange({
+            from: start,
+            to: end
+        });
+    } catch (e) {
+        console.warn("[terminal] setVisibleRange failed:", e);
+    }
 }
 
 function highlightRange(startTime, endTime) {
@@ -362,7 +425,9 @@ function highlightRange(startTime, endTime) {
                 scaleMargins: { top: 0, bottom: 0 },
             });
             hl.setData(highlightData);
-            drawings.highlights.push({ series: hl });
+            const item = { series: hl };
+            drawings.highlights.push(item);
+            drawingHistory.push({ type: 'highlight', target: hl, dataRef: item });
         }
     } catch (e) {
         console.warn("[terminal] Highlight range failed:", e);
@@ -397,10 +462,12 @@ function drawTrendLine(action) {
             ...candlestickSeries.markers || [],
         ]);
 
-        drawings.trendLines.push({
+        const item = {
             series: lineSeries,
             ...action
-        });
+        };
+        drawings.trendLines.push(item);
+        drawingHistory.push({ type: 'trendline', target: lineSeries, dataRef: item });
     } catch (e) {
         console.warn("[terminal] Draw trend line failed:", e);
     }
@@ -417,7 +484,9 @@ function drawSupportLine(price, strength) {
             axisLabelVisible: true,
             title: `S ${price}`,
         });
-        drawings.hLines.push({ priceLine, price, type: "support" });
+        const item = { priceLine, price, type: "support" };
+        drawings.hLines.push(item);
+        drawingHistory.push({ type: 'hline', target: priceLine, dataRef: item });
     } catch (e) {
         console.warn("[terminal] Draw support failed:", e);
     }
@@ -434,10 +503,39 @@ function drawResistanceLine(price, strength) {
             axisLabelVisible: true,
             title: `R ${price}`,
         });
-        drawings.hLines.push({ priceLine, price, type: "resistance" });
+        const item = { priceLine, price, type: "resistance" };
+        drawings.hLines.push(item);
+        drawingHistory.push({ type: 'hline', target: priceLine, dataRef: item });
     } catch (e) {
         console.warn("[terminal] Draw resistance failed:", e);
     }
+}
+
+function drawStructureLabels(labels) {
+    if (!labels || !Array.isArray(labels)) return;
+    
+    const currentMarkers = candlestickSeries.markers || [];
+    const newMarkers = [...currentMarkers];
+    
+    labels.forEach(lbl => {
+        const isBullish = lbl.label === "HH" || lbl.label === "HL";
+        newMarkers.push({
+            time: lbl.time,
+            position: isBullish ? "aboveBar" : "belowBar",
+            color: isBullish ? "#34D399" : "#F43F5E",
+            shape: "circle",
+            text: lbl.label,
+            id: `structure-${lbl.time}-${lbl.label}`
+        });
+    });
+    
+    candlestickSeries.setMarkers(newMarkers);
+    
+    drawingHistory.push({
+        type: 'markers',
+        target: labels.map(lbl => `structure-${lbl.time}-${lbl.label}`),
+        dataRef: labels
+    });
 }
 
 // -------------------- DRAWING TOOLS --------------------
@@ -458,6 +556,7 @@ function clearAllDrawings() {
     });
 
     drawings = { trendLines: [], hLines: [], fibLevels: [], highlights: [] };
+    drawingHistory = [];
     clearSelection();
 }
 
@@ -544,11 +643,12 @@ function handleCrosshairMove(param) {
     // Track mouse position for drawing tools
 }
 
-function handleChartClick(e) {
+function handleChartClick(param) {
+    if (!param || !param.point) return;
+    const time = param.time;
+    const price = candlestickSeries.coordinateToPrice(param.point.y);
+
     if (currentTool === "hline") {
-        const rect = chartContainer.getBoundingClientRect();
-        const y = e.clientY - rect.top;
-        const price = candlestickSeries.coordinateToPrice(y);
         if (price) {
             const priceLine = candlestickSeries.createPriceLine({
                 price: price,
@@ -558,16 +658,12 @@ function handleChartClick(e) {
                 axisLabelVisible: true,
                 title: `H ${price.toFixed(2)}`,
             });
-            drawings.hLines.push({ priceLine, price, type: "horizontal" });
+            const item = { priceLine, price, type: "horizontal" };
+            drawings.hLines.push(item);
+            drawingHistory.push({ type: 'hline', target: priceLine, dataRef: item });
             setActiveTool("pointer");
         }
     } else if (currentTool === "trendline") {
-        const rect = chartContainer.getBoundingClientRect();
-        const x = e.clientX - rect.left;
-        const y = e.clientY - rect.top;
-        const time = chart.timeScale().coordinateToTime(x);
-        const price = candlestickSeries.coordinateToPrice(y);
-
         if (time && price) {
             if (drawingState.step === 0) {
                 drawingState.step = 1;
@@ -586,24 +682,20 @@ function handleChartClick(e) {
                     { time: drawingState.startTime, value: drawingState.startPrice },
                     { time: time, value: price }
                 ]);
-                drawings.trendLines.push({
+                const item = {
                     series: lineSeries,
                     startTime: drawingState.startTime,
                     endTime: time,
                     startPrice: drawingState.startPrice,
                     endPrice: price
-                });
+                };
+                drawings.trendLines.push(item);
+                drawingHistory.push({ type: 'trendline', target: lineSeries, dataRef: item });
                 drawingState.step = 0;
                 setActiveTool("pointer");
             }
         }
     } else if (currentTool === "fibonacci") {
-        const rect = chartContainer.getBoundingClientRect();
-        const x = e.clientX - rect.left;
-        const y = e.clientY - rect.top;
-        const time = chart.timeScale().coordinateToTime(x);
-        const price = candlestickSeries.coordinateToPrice(y);
-
         if (time && price) {
             if (drawingState.step === 0) {
                 drawingState.step = 1;
@@ -629,7 +721,9 @@ function handleChartClick(e) {
                     });
                 });
 
-                drawings.fibLevels.push({ priceLines });
+                const item = { priceLines };
+                drawings.fibLevels.push(item);
+                drawingHistory.push({ type: 'fibonacci', target: priceLines, dataRef: item });
                 drawingState.step = 0;
                 setActiveTool("pointer");
             }
@@ -638,14 +732,13 @@ function handleChartClick(e) {
 
     // Check if a pattern candle was clicked
     if (currentTool === "pointer" || currentTool === "crosshair") {
-        const rect = chartContainer.getBoundingClientRect();
-        const x = e.clientX - rect.left;
-        const time = chart.timeScale().coordinateToTime(x);
-
         if (time) {
             const candle = currentCandleData.find(c => c.time === time);
             if (candle && candle.pattern) {
-                showPatternPopup(candle, e.clientX, e.clientY);
+                const rect = chartContainer.getBoundingClientRect();
+                const x = rect.left + param.point.x;
+                const y = rect.top + param.point.y;
+                showPatternPopup(candle, x, y);
             }
         }
     }
@@ -688,7 +781,10 @@ async function analyzeSelection() {
     try {
         const response = await fetch("/api/terminal-analyze", {
             method: "POST",
-            headers: { "Content-Type": "application/json" },
+            headers: { 
+                "Content-Type": "application/json",
+                "Authorization": `Bearer ${token}`
+            },
             body: JSON.stringify({
                 message: "Analyze this selected area completely",
                 symbol: currentSymbol,
@@ -703,18 +799,49 @@ async function analyzeSelection() {
             })
         });
 
+        if (response.status === 401) {
+            localStorage.removeItem("tradebot_token");
+            localStorage.removeItem("tradebot_user");
+            window.location.href = "index.html";
+            return;
+        }
+
+        if (!response.ok) {
+            throw new Error(`Server returned ${response.status}`);
+        }
+
         const data = await response.json();
-
-        if (data.chartActions) executeChartActions(data.chartActions);
-        if (data.notes) renderNotes(data.notes);
-        if (data.message) showAISummary(data.message);
-
-        renderAnalysisTags(data);
+        await handleAnalysisResponse(data);
 
     } catch (error) {
         console.error("[terminal] Analysis error:", error);
         showAISummary("Analysis failed. Please try again.");
     }
+}
+
+async function handleAnalysisResponse(data) {
+    showPatterns = true;
+    if (data.symbol && data.symbol.toUpperCase() !== currentSymbol.toUpperCase()) {
+        currentSymbol = data.symbol.toUpperCase();
+        
+        const url = new URL(window.location);
+        url.searchParams.set("symbol", currentSymbol);
+        window.history.replaceState({}, "", url);
+        
+        await loadData(currentSymbol, currentRange, currentInterval);
+    } else {
+        clearAllDrawings();
+        // Force refresh markers on the chart now that showPatterns is true
+        if (currentCandleData && currentCandleData.length > 0) {
+            renderChart({ candles: currentCandleData });
+        }
+    }
+
+    if (data.chartActions) executeChartActions(data.chartActions);
+    if (data.notes) renderNotes(data.notes);
+    if (data.message) showAISummary(data.message);
+
+    renderAnalysisTags(data);
 }
 
 async function sendTerminalChat(message) {
@@ -740,20 +867,26 @@ async function sendTerminalChat(message) {
 
         const response = await fetch("/api/terminal-analyze", {
             method: "POST",
-            headers: { "Content-Type": "application/json" },
+            headers: { 
+                "Content-Type": "application/json",
+                "Authorization": `Bearer ${token}`
+            },
             body: JSON.stringify(payload)
         });
 
+        if (response.status === 401) {
+            localStorage.removeItem("tradebot_token");
+            localStorage.removeItem("tradebot_user");
+            window.location.href = "index.html";
+            return;
+        }
+
+        if (!response.ok) {
+            throw new Error(`Server returned ${response.status}`);
+        }
+
         const data = await response.json();
-
-        // Clear previous drawings before applying new analysis
-        clearAllDrawings();
-
-        if (data.chartActions) executeChartActions(data.chartActions);
-        if (data.notes) renderNotes(data.notes);
-        if (data.message) showAISummary(data.message);
-
-        renderAnalysisTags(data);
+        await handleAnalysisResponse(data);
 
     } catch (error) {
         console.error("[terminal] Chat error:", error);
@@ -810,12 +943,13 @@ function showAISummary(text) {
 }
 
 function showAnalysisLoading() {
-    aiSummarySection.innerHTML = `
+    const loadingHtml = `
         <div class="analysis-loading">
             <div class="mini-spinner"></div>
             <span>Analyzing...</span>
         </div>
     `;
+    aiSummarySection.innerHTML = loadingHtml;
     notesList.innerHTML = "";
     analysisTags.innerHTML = "";
 }
@@ -1006,6 +1140,7 @@ function setupEventListeners() {
         window.history.replaceState({}, "", url);
 
         clearAllDrawings();
+        showPatterns = false; // Reset pattern visibility for new symbol searches
         loadData(currentSymbol, currentRange, currentInterval);
     });
 
@@ -1022,18 +1157,28 @@ function setupEventListeners() {
 
     // Delete / Clear
     document.getElementById("delete-drawing-btn").addEventListener("click", () => {
-        // Remove last drawing
-        if (drawings.trendLines.length > 0) {
-            const last = drawings.trendLines.pop();
-            try { chart.removeSeries(last.series); } catch (e) {}
-        } else if (drawings.hLines.length > 0) {
-            const last = drawings.hLines.pop();
-            try { candlestickSeries.removePriceLine(last.priceLine); } catch (e) {}
-        } else if (drawings.fibLevels.length > 0) {
-            const last = drawings.fibLevels.pop();
-            last.priceLines.forEach(pl => {
+        if (drawingHistory.length === 0) return;
+        
+        const lastDrawing = drawingHistory.pop();
+        
+        if (lastDrawing.type === 'trendline') {
+            try { chart.removeSeries(lastDrawing.target); } catch (e) {}
+            drawings.trendLines = drawings.trendLines.filter(d => d !== lastDrawing.dataRef);
+        } else if (lastDrawing.type === 'hline') {
+            try { candlestickSeries.removePriceLine(lastDrawing.target); } catch (e) {}
+            drawings.hLines = drawings.hLines.filter(d => d !== lastDrawing.dataRef);
+        } else if (lastDrawing.type === 'fibonacci') {
+            lastDrawing.target.forEach(pl => {
                 try { candlestickSeries.removePriceLine(pl); } catch (e) {}
             });
+            drawings.fibLevels = drawings.fibLevels.filter(d => d !== lastDrawing.dataRef);
+        } else if (lastDrawing.type === 'highlight') {
+            try { chart.removeSeries(lastDrawing.target); } catch (e) {}
+            drawings.highlights = drawings.highlights.filter(d => d !== lastDrawing.dataRef);
+        } else if (lastDrawing.type === 'markers') {
+            const current = candlestickSeries.markers || [];
+            const filtered = current.filter(m => !lastDrawing.target.includes(m.id || `structure-${m.time}-${m.text}`));
+            candlestickSeries.setMarkers(filtered);
         }
     });
     document.getElementById("clear-all-btn").addEventListener("click", clearAllDrawings);
@@ -1045,7 +1190,6 @@ function setupEventListeners() {
     // Chart mouse events for rectangle selection
     chartContainer.addEventListener("mousedown", handleChartMouseDown);
     chartContainer.addEventListener("mouseup", handleChartMouseUp);
-    chartContainer.addEventListener("click", handleChartClick);
 
     // Terminal chat
     terminalChatForm.addEventListener("submit", (e) => {
@@ -1058,9 +1202,43 @@ function setupEventListeners() {
 
     // Notes panel toggle
     notesToggleBtn.addEventListener("click", () => {
-        notesPanel.classList.toggle("collapsed");
-        const icon = notesToggleBtn.querySelector("i");
-        icon.className = notesPanel.classList.contains("collapsed") ? "fas fa-chevron-left" : "fas fa-chevron-right";
+        notesPanel.classList.add("collapsed");
+        aiPanelToggleFab.classList.add("visible");
+    });
+
+    aiPanelToggleFab.addEventListener("click", () => {
+        notesPanel.classList.remove("collapsed");
+        aiPanelToggleFab.classList.remove("visible");
+    });
+
+    // Right-panel drag-to-resize logic
+    let isResizing = false;
+    let startX = 0;
+    let startWidth = 0;
+
+    panelResizeHandle.addEventListener("mousedown", (e) => {
+        isResizing = true;
+        startX = e.clientX;
+        startWidth = notesPanel.getBoundingClientRect().width;
+        panelResizeHandle.classList.add("active");
+        document.body.style.cursor = "ew-resize";
+        document.body.style.userSelect = "none";
+    });
+
+    document.addEventListener("mousemove", (e) => {
+        if (!isResizing) return;
+        
+        const deltaX = e.clientX - startX;
+        const newWidth = Math.max(300, Math.min(700, startWidth - deltaX));
+        notesPanel.style.width = `${newWidth}px`;
+    });
+
+    document.addEventListener("mouseup", () => {
+        if (!isResizing) return;
+        isResizing = false;
+        panelResizeHandle.classList.remove("active");
+        document.body.style.cursor = "";
+        document.body.style.userSelect = "";
     });
 
     // Pattern popup close

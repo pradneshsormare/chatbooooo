@@ -1,6 +1,7 @@
 // stockTools.js
 // Fetches daily OHLC candles (no API key needed, via stooq.com CSV) and
 // detects common candlestick patterns using standard technical-analysis rules.
+import { EMA, RSI } from "trading-signals";
 
 /**
  * Fetch recent daily candles for a symbol.
@@ -290,121 +291,330 @@ function detectSpinningTop(c) {
  * Detect trend direction, strength, higher-highs/lows, and reversal signals.
  * Returns structured data with chart positions.
  */
-export function detectTrend(candles) {
-  if (!candles || candles.length < 3) {
-    return { direction: "neutral", strength: 0, confidence: 0, details: [] };
+export function findSwingPoints(candles, lookback = 3) {
+  const highs = [];
+  const lows = [];
+
+  for (let i = lookback; i < candles.length - lookback; i++) {
+    const current = candles[i];
+    let isSwingHigh = true;
+    let isSwingLow = true;
+
+    for (let j = 1; j <= lookback; j++) {
+      if (
+        current.high <= candles[i - j].high ||
+        current.high <= candles[i + j].high
+      ) {
+        isSwingHigh = false;
+      }
+
+      if (
+        current.low >= candles[i - j].low ||
+        current.low >= candles[i + j].low
+      ) {
+        isSwingLow = false;
+      }
+    }
+
+    if (isSwingHigh) {
+      highs.push({
+        index: i,
+        time: current.date,
+        price: current.high
+      });
+    }
+
+    if (isSwingLow) {
+      lows.push({
+        index: i,
+        time: current.date,
+        price: current.low
+      });
+    }
   }
+
+  return { highs, lows };
+}
+
+export function analyzeMarketStructure(swings) {
+  let bullishPoints = 0;
+  let bearishPoints = 0;
+  const labels = [];
+
+  for (let i = 1; i < swings.highs.length; i++) {
+    const previous = swings.highs[i - 1];
+    const current = swings.highs[i];
+
+    if (current.price > previous.price) {
+      bullishPoints++;
+      labels.push({ ...current, label: "HH" });
+    } else {
+      bearishPoints++;
+      labels.push({ ...current, label: "LH" });
+    }
+  }
+
+  for (let i = 1; i < swings.lows.length; i++) {
+    const previous = swings.lows[i - 1];
+    const current = swings.lows[i];
+
+    if (current.price > previous.price) {
+      bullishPoints++;
+      labels.push({ ...current, label: "HL" });
+    } else {
+      bearishPoints++;
+      labels.push({ ...current, label: "LL" });
+    }
+  }
+
+  let trend = "sideways";
+  if (bullishPoints > bearishPoints * 1.5) {
+    trend = "bullish";
+  } else if (bearishPoints > bullishPoints * 1.5) {
+    trend = "bearish";
+  }
+
+  return {
+    trend,
+    bullishPoints,
+    bearishPoints,
+    labels
+  };
+}
+
+export function calculateSlope(candles) {
+  if (candles.length < 2) {
+    return { value: 0, normalized: 0, direction: "flat" };
+  }
+
+  const n = candles.length;
+  let sumX = 0;
+  let sumY = 0;
+  let sumXY = 0;
+  let sumXX = 0;
+
+  candles.forEach((candle, index) => {
+    sumX += index;
+    sumY += candle.close;
+    sumXY += index * candle.close;
+    sumXX += index * index;
+  });
+
+  const slope = (n * sumXY - sumX * sumY) / (n * sumXX - sumX * sumX);
+  const averagePrice = sumY / n;
+  const normalized = averagePrice > 0 ? (slope / averagePrice) * 100 : 0;
+
+  let direction = "flat";
+  if (normalized > 0.05) {
+    direction = "up";
+  } else if (normalized < -0.05) {
+    direction = "down";
+  }
+
+  return {
+    value: Number(slope.toFixed(4)),
+    normalized: Number(normalized.toFixed(4)),
+    direction
+  };
+}
+
+export function calculateEMA(candles, period) {
+  const emaValues = [];
+  if (!candles || candles.length === 0) return emaValues;
+
+  const ema = new EMA(period);
+  candles.forEach(c => {
+    ema.update(c.close);
+    if (ema.isStable) {
+      emaValues.push(Number(parseFloat(ema.getResult().toString()).toFixed(2)));
+    } else {
+      emaValues.push(Number(c.close.toFixed(2)));
+    }
+  });
+  return emaValues;
+}
+
+export function analyzeEMA(candles, ema20, ema50) {
+  const currentPrice = candles[candles.length - 1].close;
+  const currentEMA20 = ema20[ema20.length - 1];
+  const currentEMA50 = ema50[ema50.length - 1];
+
+  let trend = "neutral";
+  if (currentPrice > currentEMA20 && currentEMA20 > currentEMA50) {
+    trend = "bullish";
+  } else if (currentPrice < currentEMA20 && currentEMA20 < currentEMA50) {
+    trend = "bearish";
+  }
+
+  return {
+    trend,
+    currentPrice,
+    ema20: currentEMA20,
+    ema50: currentEMA50,
+    priceAboveEMA20: currentPrice > currentEMA20,
+    priceAboveEMA50: currentPrice > currentEMA50
+  };
+}
+
+export function calculateRSI(candles, period = 14) {
+  const rsiValues = [];
+  if (!candles || candles.length === 0) return rsiValues;
+
+  const rsi = new RSI(period);
+  candles.forEach(c => {
+    rsi.update(c.close);
+    if (rsi.isStable) {
+      rsiValues.push(Number(parseFloat(rsi.getResult().toString()).toFixed(2)));
+    } else {
+      rsiValues.push(50);
+    }
+  });
+  return rsiValues;
+}
+
+export function analyzeRSI(rsiValues) {
+  const rsi = rsiValues[rsiValues.length - 1];
+  let momentum = "neutral";
+
+  if (rsi >= 70) {
+    momentum = "overbought";
+  } else if (rsi >= 55) {
+    momentum = "bullish";
+  } else if (rsi <= 30) {
+    momentum = "oversold";
+  } else if (rsi <= 45) {
+    momentum = "bearish";
+  }
+
+  return {
+    value: Number(rsi.toFixed(2)),
+    momentum
+  };
+}
+
+
+export async function analyzeMultiTimeframeTrend({ dailyCandles, hourlyCandles, selectedCandles }) {
+  const globalTrend = detectTrend(dailyCandles);
+  const mediumTrend = hourlyCandles ? detectTrend(hourlyCandles) : null;
+  const selectedTrend = selectedCandles ? detectTrend(selectedCandles) : null;
+  const recentCandles = selectedCandles ? selectedCandles.slice(-10) : dailyCandles.slice(-10);
+  const recentTrend = detectTrend(recentCandles);
+
+  return {
+    global: globalTrend,
+    medium: mediumTrend,
+    selected: selectedTrend,
+    recent: recentTrend
+  };
+}
+
+export function detectTrend(candles) {
+  if (!candles || candles.length < 5) {
+    return {
+      direction: "sideways",
+      trend: "sideways",
+      confidence: 0,
+      strength: 0,
+      details: [],
+      startTime: candles && candles[0] ? candles[0].date : null,
+      endTime: candles && candles[0] ? candles[candles.length - 1].date : null,
+      startPrice: candles && candles[0] ? candles[0].close : 0,
+      endPrice: candles && candles[0] ? candles[candles.length - 1].close : 0,
+      swingHighs: [],
+      swingLows: [],
+      changePct: 0
+    };
+  }
+
+  const swings = findSwingPoints(candles);
+  const structure = analyzeMarketStructure(swings);
+  const slope = calculateSlope(candles);
+
+  const ema20 = calculateEMA(candles, 20);
+  const ema50 = calculateEMA(candles, 50);
+  const emaAnalysis = analyzeEMA(candles, ema20, ema50);
+
+  const rsiValues = calculateRSI(candles, 14);
+  const rsiAnalysis = analyzeRSI(rsiValues);
+
+  const volumeAnalysis = analyzeVolume(candles);
+
+  // Weighted scoring
+  let score = 0;
+  if (structure.trend === "bullish") score += 40;
+  else if (structure.trend === "bearish") score -= 40;
+
+  if (emaAnalysis.trend === "bullish") score += 25;
+  else if (emaAnalysis.trend === "bearish") score -= 25;
+
+  if (slope.direction === "up") score += 20;
+  else if (slope.direction === "down") score -= 20;
+
+  if (rsiAnalysis.momentum === "bullish" || rsiAnalysis.momentum === "overbought") score += 15;
+  else if (rsiAnalysis.momentum === "bearish" || rsiAnalysis.momentum === "oversold") score -= 15;
+
+  let trend = "sideways";
+  if (score >= 35) {
+    trend = score >= 70 ? "strong_bullish" : "bullish";
+  } else if (score <= -35) {
+    trend = score <= -70 ? "strong_bearish" : "bearish";
+  }
+
+  const confidence = Math.min(100, Math.round(Math.abs(score)));
+  const strength = Math.min(100, Math.round(Math.abs(score) * 1.1));
+
+  // Determine direction mapping for backward compatibility
+  let direction = "sideways";
+  if (trend.includes("bullish")) direction = "bullish";
+  if (trend.includes("bearish")) direction = "bearish";
+
+  // Determine trend weakening: last few candles opposing the main trend
+  const recentSlice = candles.slice(-Math.min(5, Math.floor(candles.length / 3)));
+  const recentSlope = calculateSlope(recentSlice);
+  const weakening = (direction === "bullish" && recentSlope.direction === "down") ||
+                    (direction === "bearish" && recentSlope.direction === "up");
+  const possibleReversal = weakening && Math.abs(recentSlope.normalized) > 0.15;
 
   const first = candles[0];
   const last = candles[candles.length - 1];
   const changePct = ((last.close - first.close) / first.close) * 100;
 
-  // Find swing highs and swing lows (local peaks and troughs)
-  const swingHighs = [];
-  const swingLows = [];
-  for (let i = 2; i < candles.length - 2; i++) {
-    const c = candles[i];
-    if (c.high > candles[i-1].high && c.high > candles[i-2].high &&
-        c.high > candles[i+1].high && c.high > candles[i+2].high) {
-      swingHighs.push({ index: i, price: c.high, time: c.date });
-    }
-    if (c.low < candles[i-1].low && c.low < candles[i-2].low &&
-        c.low < candles[i+1].low && c.low < candles[i+2].low) {
-      swingLows.push({ index: i, price: c.low, time: c.date });
-    }
-  }
-
-  // Detect higher-highs, higher-lows, lower-highs, lower-lows
-  let higherHighs = 0, lowerHighs = 0;
-  for (let i = 1; i < swingHighs.length; i++) {
-    if (swingHighs[i].price > swingHighs[i-1].price) higherHighs++;
-    else lowerHighs++;
-  }
-  let higherLows = 0, lowerLows = 0;
-  for (let i = 1; i < swingLows.length; i++) {
-    if (swingLows[i].price > swingLows[i-1].price) higherLows++;
-    else lowerLows++;
-  }
-
-  // Trend direction scoring
-  let bullScore = higherHighs + higherLows;
-  let bearScore = lowerHighs + lowerLows;
-  let totalSwings = bullScore + bearScore;
-
-  let direction = "sideways";
-  let confidence = 0;
-  if (totalSwings > 0) {
-    if (bullScore > bearScore) {
-      direction = "bullish";
-      confidence = Math.round((bullScore / totalSwings) * 100);
-    } else if (bearScore > bullScore) {
-      direction = "bearish";
-      confidence = Math.round((bearScore / totalSwings) * 100);
-    } else {
-      direction = "sideways";
-      confidence = 50;
-    }
-  } else {
-    // Fallback: use simple price change
-    if (changePct > 2) { direction = "bullish"; confidence = 60; }
-    else if (changePct < -2) { direction = "bearish"; confidence = 60; }
-    else { direction = "sideways"; confidence = 50; }
-  }
-
-  // Trend strength (0-100) based on consistency and magnitude
-  const avgBody = candles.reduce((sum, c) => sum + body(c), 0) / candles.length;
-  const avgRange = candles.reduce((sum, c) => sum + range(c), 0) / candles.length;
-  const bodyRatio = avgRange > 0 ? (avgBody / avgRange) : 0;
-  const strength = Math.min(100, Math.round(
-    Math.abs(changePct) * 3 + bodyRatio * 30 + confidence * 0.4
-  ));
-
-  // Detect trend weakening: last few candles opposing the main trend
-  const recentSlice = candles.slice(-Math.min(5, Math.floor(candles.length / 3)));
-  const recentChange = recentSlice.length > 1
-    ? ((recentSlice[recentSlice.length-1].close - recentSlice[0].close) / recentSlice[0].close) * 100
-    : 0;
-  const weakening = (direction === "bullish" && recentChange < -1) ||
-                    (direction === "bearish" && recentChange > 1);
-
-  // Possible reversal detection
-  const possibleReversal = weakening && Math.abs(recentChange) > 2;
-
   // Build details for notes
   const details = [];
-  if (direction === "bullish") {
-    details.push({ time: first.date, text: `Bullish trend started`, category: "trend" });
-    if (higherHighs > 0) details.push({ time: swingHighs[swingHighs.length-1]?.time || last.date, text: `${higherHighs} higher high(s) detected`, category: "trend" });
-    if (higherLows > 0) details.push({ time: swingLows[swingLows.length-1]?.time || last.date, text: `${higherLows} higher low(s) detected`, category: "trend" });
-  } else if (direction === "bearish") {
-    details.push({ time: first.date, text: `Bearish trend started`, category: "trend" });
-    if (lowerHighs > 0) details.push({ time: swingHighs[swingHighs.length-1]?.time || last.date, text: `${lowerHighs} lower high(s) detected`, category: "trend" });
-    if (lowerLows > 0) details.push({ time: swingLows[swingLows.length-1]?.time || last.date, text: `${lowerLows} lower low(s) detected`, category: "trend" });
-  }
+  details.push({
+    time: first.date,
+    text: `Trend score: ${score} (${trend.replace("_", " ")}). Structure: ${structure.trend}, EMA: ${emaAnalysis.trend}, RSI: ${rsiAnalysis.momentum}.`,
+    category: "trend"
+  });
+
   if (weakening) {
-    details.push({ time: recentSlice[0].date, text: `Trend weakening detected`, category: "warning" });
-  }
-  if (possibleReversal) {
-    details.push({ time: last.date, text: `Possible trend reversal`, category: "warning" });
+    details.push({
+      time: last.date,
+      text: `Trend weakening: short-term slope is ${recentSlope.direction} against main trend.`,
+      category: "warning"
+    });
   }
 
   return {
     direction,
-    strength,
+    trend,
+    score,
     confidence,
-    changePct: Number(changePct.toFixed(2)),
+    strength,
     startTime: first.date,
     endTime: last.date,
     startPrice: first.close,
     endPrice: last.close,
-    higherHighs,
-    higherLows,
-    lowerHighs,
-    lowerLows,
+    changePct: Number(changePct.toFixed(2)),
+    swingHighs: swings.highs,
+    swingLows: swings.lows,
+    structure,
+    slope,
+    ema: emaAnalysis,
+    rsi: rsiAnalysis,
+    volume: volumeAnalysis,
     weakening,
     possibleReversal,
-    swingHighs,
-    swingLows,
     details
   };
 }
@@ -873,40 +1083,43 @@ export function detectPatterns(candles) {
     throw new Error("Need at least 3 candles to detect patterns.");
   }
 
-  const c = candles[candles.length - 1];
-  const prev = candles[candles.length - 2];
-  const prev2 = candles[candles.length - 3];
-
   const matches = [];
+  const scanLimit = Math.max(2, candles.length - 20);
 
-  if (detectDoji(c)) matches.push({ pattern: "Doji", signal: "neutral" });
-  if (detectHammer(c)) matches.push({ pattern: "Hammer", signal: "bullish" });
-  if (detectInvertedHammer(c) && !detectShootingStar(c, prev))
-    matches.push({ pattern: "Inverted Hammer", signal: "bullish" });
-  if (detectShootingStar(c, prev))
-    matches.push({ pattern: "Shooting Star", signal: "bearish" });
-  if (detectBullishEngulfing(c, prev))
-    matches.push({ pattern: "Bullish Engulfing", signal: "bullish" });
-  if (detectBearishEngulfing(c, prev))
-    matches.push({ pattern: "Bearish Engulfing", signal: "bearish" });
-  if (detectMorningStar(c, prev, prev2))
-    matches.push({ pattern: "Morning Star", signal: "bullish" });
-  if (detectEveningStar(c, prev, prev2))
-    matches.push({ pattern: "Evening Star", signal: "bearish" });
-  if (detectThreeWhiteSoldiers(c, prev, prev2))
-    matches.push({ pattern: "Three White Soldiers", signal: "bullish" });
-  if (detectThreeBlackCrows(c, prev, prev2))
-    matches.push({ pattern: "Three Black Crows", signal: "bearish" });
-  // New patterns
-  if (detectBullishMarubozu(c))
-    matches.push({ pattern: "Bullish Marubozu", signal: "bullish" });
-  if (detectBearishMarubozu(c))
-    matches.push({ pattern: "Bearish Marubozu", signal: "bearish" });
-  if (detectSpinningTop(c))
-    matches.push({ pattern: "Spinning Top", signal: "neutral" });
+  for (let i = candles.length - 1; i >= scanLimit; i--) {
+    const c = candles[i];
+    const prev = candles[i - 1];
+    const prev2 = candles[i - 2];
+    const dateStr = c.date || c.time;
+
+    if (detectDoji(c)) matches.push({ date: dateStr, close: c.close, pattern: "Doji", signal: "neutral" });
+    if (detectHammer(c)) matches.push({ date: dateStr, close: c.close, pattern: "Hammer", signal: "bullish" });
+    if (detectInvertedHammer(c) && !detectShootingStar(c, prev))
+      matches.push({ date: dateStr, close: c.close, pattern: "Inverted Hammer", signal: "bullish" });
+    if (detectShootingStar(c, prev))
+      matches.push({ date: dateStr, close: c.close, pattern: "Shooting Star", signal: "bearish" });
+    if (detectBullishEngulfing(c, prev))
+      matches.push({ date: dateStr, close: c.close, pattern: "Bullish Engulfing", signal: "bullish" });
+    if (detectBearishEngulfing(c, prev))
+      matches.push({ date: dateStr, close: c.close, pattern: "Bearish Engulfing", signal: "bearish" });
+    if (detectMorningStar(c, prev, prev2))
+      matches.push({ date: dateStr, close: c.close, pattern: "Morning Star", signal: "bullish" });
+    if (detectEveningStar(c, prev, prev2))
+      matches.push({ date: dateStr, close: c.close, pattern: "Evening Star", signal: "bearish" });
+    if (detectThreeWhiteSoldiers(c, prev, prev2))
+      matches.push({ date: dateStr, close: c.close, pattern: "Three White Soldiers", signal: "bullish" });
+    if (detectThreeBlackCrows(c, prev, prev2))
+      matches.push({ date: dateStr, close: c.close, pattern: "Three Black Crows", signal: "bearish" });
+    if (detectBullishMarubozu(c))
+      matches.push({ date: dateStr, close: c.close, pattern: "Bullish Marubozu", signal: "bullish" });
+    if (detectBearishMarubozu(c))
+      matches.push({ date: dateStr, close: c.close, pattern: "Bearish Marubozu", signal: "bearish" });
+    if (detectSpinningTop(c))
+      matches.push({ date: dateStr, close: c.close, pattern: "Spinning Top", signal: "neutral" });
+  }
 
   if (matches.length === 0) {
-    matches.push({ pattern: "No standard pattern detected", signal: "neutral" });
+    matches.push({ pattern: "No standard patterns detected in the last 20 candles", signal: "neutral" });
   }
 
   // simple trend context over the visible window
@@ -915,7 +1128,7 @@ export function detectPatterns(candles) {
   const trendPct = (((last.close - first.close) / first.close) * 100).toFixed(2);
 
   return {
-    latestCandle: c,
+    latestCandle: candles[candles.length - 1],
     matches,
     trend: {
       periodDays: candles.length,

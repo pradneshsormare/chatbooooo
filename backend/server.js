@@ -7,10 +7,10 @@ import path from "path";
 import { fileURLToPath } from "url";
 
 // Route imports
+import authRoutes from "./routes/authRoutes.js";
 import chatRoutes from "./routes/chatRoutes.js";
 import marketRoutes from "./routes/marketRoutes.js";
 import terminalRoutes from "./routes/terminalRoutes.js";
-import quizRoutes from "./routes/quizRoutes.js";
 
 const app = express();
 
@@ -32,10 +32,11 @@ app.get("/api/health", (req, res) => {
 });
 
 // --- Register routes ---
+app.use(authRoutes);
 app.use(chatRoutes);
 app.use(marketRoutes);
 app.use(terminalRoutes);
-app.use(quizRoutes);
+
 
 // --- Start server ---
 const PORT = process.env.PORT || 3000;

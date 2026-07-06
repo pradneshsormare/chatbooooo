@@ -50,6 +50,12 @@ export async function executeAnalysisTools(parsed, candles, symbol) {
         strength: results.trend.strength
       });
     }
+    if (results.trend.structure && results.trend.structure.labels && results.trend.structure.labels.length > 0) {
+      chartActions.push({
+        type: "DRAW_STRUCTURE_LABELS",
+        labels: results.trend.structure.labels
+      });
+    }
     notes.push(...results.trend.details);
   }
 
