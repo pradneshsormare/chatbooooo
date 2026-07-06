@@ -30,5 +30,29 @@
     "symbol": "TCS.NS",
     "summary": "Analyzed TCS.NS stock performance in April (detected positive trend)",
     "created_at": "2026-07-06T17:07:59.011Z"
+  },
+  {
+    "id": 1783358484749,
+    "user_id": "1783358462447",
+    "query": "Suggest an Indian stock index to track.",
+    "symbol": "^NSEI",
+    "summary": "Recommended Indian stock index to track: NSEI.",
+    "created_at": "2026-07-06T17:21:23.894Z"
+  },
+  {
+    "id": 1783358690401,
+    "user_id": "1783358652625",
+    "query": "give me best stocks to invest in",
+    "symbol": "INFY.NS",
+    "summary": "Provided market analysis for best stocks to invest in",
+    "created_at": "2026-07-06T17:24:49.562Z"
+  },
+  {
+    "id": 1783358732249,
+    "user_id": "1783358652625",
+    "query": "name of the stocks i can invest in",
+    "symbol": "RELIANCE.NS",
+    "summary": "Provided stock investment options based on candlestick pattern analysis.",
+    "created_at": "2026-07-06T17:25:31.982Z"
   }
 ]
