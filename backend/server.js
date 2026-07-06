@@ -44,6 +44,10 @@ app.use(terminalRoutes);
 app.use(historyRoutes);
 
 
-// --- Start server ---
+// --- Start server (only when run locally, not on Vercel) ---
 const PORT = process.env.PORT || 3000;
-app.listen(PORT, () => console.log(`TradeBot server running at http://localhost:${PORT}`));
+if (!process.env.VERCEL) {
+  app.listen(PORT, () => console.log(`TradeBot server running at http://localhost:${PORT}`));
+}
+
+export default app;
