@@ -23,7 +23,6 @@
             <span>TradeBot AI</span>
         </div>
         <div style="display: flex; gap: 1rem; align-items: center;">
-            <button id="history-toggle-btn" class="nav-button-secondary"><i class="fas fa-history"></i> History</button>
             <a href="terminal.html?symbol=RELIANCE.NS" class="nav-button"><i class="fas fa-chart-bar"></i> Terminal</a>
             <div id="user-profile" class="user-profile-menu">
                 <span id="user-display-name"><i class="fas fa-user-circle"></i> Loading...</span>
@@ -32,44 +31,30 @@
         </div>
     </header>
 
-    <main class="chat-layout">
-        <!-- History Sidebar -->
-        <aside id="history-sidebar" class="history-sidebar collapsed">
-            <div class="sidebar-header">
-                <h3><i class="fas fa-history"></i> Search History</h3>
-                <button id="clear-history-btn" class="clear-btn" title="Clear all history"><i class="fas fa-trash-alt"></i> Clear</button>
+    <main class="chat-container">
+        <div id="chat-messages">
+            <div class="message bot-message">
+                <p>Hello! I'm TradeBot. How can I help you with the Indian share market, stocks, or SIPs today?</p>
             </div>
-            <div id="history-list" class="history-list">
-                <p class="history-empty">No search history yet.</p>
-            </div>
-        </aside>
-
-        <!-- Chat Container -->
-        <div class="chat-container">
-            <div id="chat-messages">
-                <div class="message bot-message">
-                    <p>Hello! I'm TradeBot. How can I help you with the Indian share market, stocks, or SIPs today?</p>
-                </div>
-            </div>
-            
-            <form id="chat-form">
-                <input 
-                    type="text" 
-                    id="user-input" 
-                    placeholder="Ask me anything..."
-                    autocomplete="off"
-                    required
-                >
-                <!-- Updated Button with SVG Icon -->
-                <button type="submit" aria-label="Send Message">
-                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor">
-                        <path d="M3.478 2.405a.75.75 0 00-.926.94l2.432 7.905H13.5a.75.75 0 010 1.5H4.984l-2.432 7.905a.75.75 0 00.926.94 60.519 60.519 0 0018.445-8.986.75.75 0 000-1.218A60.517 60.517 0 003.478 2.405z" />
-                    </svg>
-                </button>
-            </form>
         </div>
+        
+        <form id="chat-form">
+            <input 
+                type="text" 
+                id="user-input" 
+                placeholder="Ask me anything..."
+                autocomplete="off"
+                required
+            >
+            <!-- Updated Button with SVG Icon -->
+            <button type="submit" aria-label="Send Message">
+                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor">
+                    <path d="M3.478 2.405a.75.75 0 00-.926.94l2.432 7.905H13.5a.75.75 0 010 1.5H4.984l-2.432 7.905a.75.75 0 00.926.94 60.519 60.519 0 0018.445-8.986.75.75 0 000-1.218A60.517 60.517 0 003.478 2.405z" />
+                </svg>
+            </button>
+        </form>
     </main>
-
+    
     <script type="module" src="script.js"></script>
 </body>
 </html>
