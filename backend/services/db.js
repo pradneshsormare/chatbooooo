@@ -14,24 +14,59 @@ const usersPath = isVercel
   : path.join(__dirname, "..", "data", "users.json");
 
 const { Pool } = pg;
-const connectionString = process.env.DATABASE_URL || "postgresql://postgres:postgres@localhost:5432/tradebot";
+const dbUrl = process.env.DATABASE_URL;
+
+// On Vercel, if DATABASE_URL is not set or points to localhost/127.0.0.1, use fallback immediately
+const isLocalDb = !dbUrl || dbUrl.includes("localhost") || dbUrl.includes("127.0.0.1");
+let useFallback = isVercel && isLocalDb;
+
+const connectionString = dbUrl || "postgresql://postgres:postgres@localhost:5432/tradebot";
 
 let pool = null;
-let useFallback = false;
 
-try {
-  pool = new Pool({
-    connectionString,
-    connectionTimeoutMillis: 2000 // 2 seconds timeout to fail quickly if Postgres is not running
-  });
-} catch (e) {
-  useFallback = true;
+if (!useFallback) {
+  try {
+    pool = new Pool({
+      connectionString,
+      connectionTimeoutMillis: 2000 // 2 seconds timeout to fail quickly if Postgres is not running
+    });
+    pool.on("error", (err) => {
+      console.error("Unexpected error on idle database client:", err);
+      useFallback = true;
+    });
+  } catch (e) {
+    console.error("Failed to initialize PG Pool:", e);
+    useFallback = true;
+  }
+}
+
+function ensureFallbackFiles() {
+  // Ensure fallback folder and files exist
+  const dir = path.dirname(fallbackHistoryPath);
+  try {
+    if (!fs.existsSync(dir)) {
+      fs.mkdirSync(dir, { recursive: true });
+    }
+    if (!fs.existsSync(fallbackHistoryPath)) {
+      fs.writeFileSync(fallbackHistoryPath, JSON.stringify([]));
+    }
+    if (!fs.existsSync(usersPath)) {
+      fs.writeFileSync(usersPath, JSON.stringify([]));
+    }
+  } catch (e) {
+    console.error("Failed to initialize fallback JSON files:", e);
+  }
 }
 
 /**
  * Initializes the database tables if they do not exist.
  */
 export async function initDatabase() {
+  if (useFallback) {
+    ensureFallbackFiles();
+    return;
+  }
+
   try {
     const client = await pool.connect();
     
@@ -69,17 +104,7 @@ export async function initDatabase() {
     console.log(`     - History: ${fallbackHistoryPath}`);
     console.log("=============================================================");
     
-    // Ensure fallback folder and files exist
-    const dir = path.dirname(fallbackHistoryPath);
-    if (!fs.existsSync(dir)) {
-      fs.mkdirSync(dir, { recursive: true });
-    }
-    if (!fs.existsSync(fallbackHistoryPath)) {
-      fs.writeFileSync(fallbackHistoryPath, JSON.stringify([]));
-    }
-    if (!fs.existsSync(usersPath)) {
-      fs.writeFileSync(usersPath, JSON.stringify([]));
-    }
+    ensureFallbackFiles();
   }
 }
 
