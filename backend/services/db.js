@@ -5,7 +5,12 @@ import { fileURLToPath } from "url";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
-const isVercel = !!process.env.VERCEL;
+const isVercel =
+  !!process.env.VERCEL ||
+  !!process.env.NOW_REGION ||
+  !!process.env.LAMBDA_TASK_ROOT ||
+  process.cwd() === "/var/task" ||
+  __dirname.includes("/var/task");
 const fallbackHistoryPath = isVercel
   ? path.join("/tmp", "search_history.json")
   : path.join(__dirname, "..", "data", "search_history.json");
