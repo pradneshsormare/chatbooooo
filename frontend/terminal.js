@@ -492,7 +492,7 @@ function updateHeader(data) {
         headerChange.textContent = "";
     }
 
-    document.title = `${data.symbol} — TradeBot Terminal`;
+    document.title = `${data.symbol} — TradeMind Terminal`;
 }
 
 function formatPrice(price, symbol) {

@@ -50,10 +50,12 @@ export async function handleChat(req, res) {
       return res.status(400).json({ error: "Missing 'message' in request body" });
     }
 
-    // Check for terminal-intent commands
+    // Check for terminal-intent commands and graph requests
     const terminalIntentRegex = /\b(open\s+(the\s+)?terminal|show\s+(me\s+)?(the\s+)?terminal|analyse?\s+.*\s+in\s+terminal)\b/i;
     const isTerminalIntent = terminalIntentRegex.test(userMessage);
     const technicalOrTerminalRegex = /\b(open|show|terminal|analyse|analysis|chart|pattern|support|resistance|rsi|macd|indicator|fibonacci|trend|level|levels)\b/i;
+    const graphKeywords = /\b(chart|graph|plot|visualise|visualize|draw|candlestick|pattern|trend|rsi|macd|indicator|ohlc|terminal|analyse|analysis|history|performance)\b/i;
+    let isGraphNeeded = graphKeywords.test(userMessage);
 
     // Step 1: Detect stock reference using Groq
     const intent = await detectStockIntent(userMessage);
@@ -143,6 +145,7 @@ Use the real-time figures above in your analysis. Be specific, realistic, and ob
 
       for (const toolCall of responseMessage.tool_calls) {
         if (toolCall.function.name === "getCandlestickAnalysis") {
+          isGraphNeeded = true;
           const args = JSON.parse(toolCall.function.arguments);
           const symbol = args.symbol;
           const daysVal = args.days;
@@ -208,19 +211,28 @@ Use the real-time figures above in your analysis. Be specific, realistic, and ob
       }
 
       // Step 6: Second Groq call with tool results
-      messagesToSend[0].content = `You are a wise, ancient, and fiery trading dragon who is also a professional financial analyst. You have just received FRESH candlestick pattern analysis data from your magical tools. This data scans the last 20 trading days. Analyze and explain these results in your dragon persona, using vivid metaphors of fire, scales, claws, and ancient scrolls.
+      messagesToSend[0].content = `You are TradeMind, an expert trading analyst and mentor with deep, practical knowledge across equities, forex, commodities, crypto, and derivatives. You have just received FRESH candlestick pattern analysis data from your tools. Analyze and explain these results professionally.
 
-CRITICAL RULES:
-- Use ONLY the tool result data you just received. Do NOT repeat or reference any previous analysis.
+CORE BEHAVIOR
+- Answer only what is asked. Do not add unrelated information, disclaimers-as-filler, or generic market commentary.
+- Be concise and precise. Use bullet points or short paragraphs.
+- Use only the tool result data you just received. Do not repeat or reference any previous analysis.
 - Analyze and explain the complete 20-day candlestick pattern development trend. List the specific patterns detected across this 20-candle window, referencing their dates, close prices, and whether they are bullish/bearish/neutral.
 - Mention the general trend direction and change percentage over the period from the tool trend data.
 - Mention specific OHLC price numbers from the latest candle to make the final state concrete.
 - Give a clear overall trend verdict based on all the pattern signals combined.
-- Do NOT use any Markdown formatting (no asterisks, backticks, or hashes).
-- Structure your response with clear paragraphs separated by newlines.
-- For lists, use a dash (-) at the start of each line.
-- Every response must be unique and directly tied to the fresh data. Never give a generic or templated answer.
-- Current timestamp: ${new Date().toISOString()} — use this to vary your phrasing and opening lines.`;
+
+TONE
+- Confident, professional, and direct — like a seasoned trading desk analyst.
+- No emojis, no exaggerated language.
+- Admit uncertainty if the setup is unclear.
+
+FORMATTING CONSTRAINTS
+- Do NOT use Markdown formatting like asterisks (*) or backticks (\`).
+- For headers, you may use hashes (e.g. ### Header) at the beginning of a line.
+- For lists, start each item line with a dash (-).
+- Structure your response using clear, distinct paragraphs separated by a single newline.
+- Current timestamp: ${new Date().toISOString()}`;
 
       console.log(`[server] Sending tool results back to Groq for final interpretation...`);
 
@@ -249,7 +261,7 @@ CRITICAL RULES:
 
     const responsePayload = {
       text: reply,
-      stockData: stockData,
+      stockData: isGraphNeeded ? stockData : null,
       terminalTicker: (stockData && stockData.ticker) ? stockData.ticker : (intent.hasStock ? intent.ticker : null)
     };
 

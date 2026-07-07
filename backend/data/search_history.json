@@ -54,5 +54,37 @@
     "symbol": "RELIANCE.NS",
     "summary": "Provided stock investment options based on candlestick pattern analysis.",
     "created_at": "2026-07-06T17:25:31.982Z"
+  },
+  {
+    "id": 1783432917409,
+    "user_id": "1783358652625",
+    "query": "hii",
+    "symbol": null,
+    "summary": "Initiated conversation with a greeting, awaiting user request for trading or market assistance.",
+    "created_at": "2026-07-07T14:01:56.962Z"
+  },
+  {
+    "id": 1783432934600,
+    "user_id": "1783358652625",
+    "query": "give me tcs stock",
+    "symbol": "TCS.NS",
+    "summary": "Provided TCS stock analysis with 20-day candlestick patterns.",
+    "created_at": "2026-07-07T14:02:13.632Z"
+  },
+  {
+    "id": 1783432987899,
+    "user_id": "1783358652625",
+    "query": "tcs stock price analysis",
+    "symbol": "TCS.NS",
+    "summary": "Analyzed TCS.NS stock (identified strong bearish trend)",
+    "created_at": "2026-07-07T14:03:07.034Z"
+  },
+  {
+    "id": 1783433020626,
+    "user_id": "1783358652625",
+    "query": "when price will be high in this month",
+    "symbol": "AAPL",
+    "summary": "Provided 20-day candlestick pattern analysis for the current month.",
+    "created_at": "2026-07-07T14:03:39.907Z"
   }
 ]

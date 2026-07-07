@@ -160,7 +160,7 @@ export async function analyzeTerminal(req, res) {
     // Step 5: Generate AI text summary using Groq
     let aiSummary = analysis.message;
     try {
-      const summaryPrompt = `You are TradeBot, a professional trading analyst. Based on this analysis data, provide a concise, insightful summary. Do NOT use markdown formatting (no asterisks, backticks, hashes). Use plain text with clear paragraphs.
+      const summaryPrompt = `You are TradeMind, an expert trading analyst and mentor. Based on this analysis data, provide a concise, insightful summary. Do NOT use markdown formatting (no asterisks, backticks, hashes). Use plain text with clear paragraphs.
 
 Analysis Data:
 ${JSON.stringify(analysis.results, null, 2)}
