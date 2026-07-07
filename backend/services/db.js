@@ -5,25 +5,33 @@ import { fileURLToPath } from "url";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
-const isVercel =
-  !!process.env.VERCEL ||
-  !!process.env.NOW_REGION ||
-  !!process.env.LAMBDA_TASK_ROOT ||
-  process.cwd() === "/var/task" ||
-  __dirname.includes("/var/task");
-const fallbackHistoryPath = isVercel
+// Test if the filesystem is read-only (like Vercel serverless environment)
+let isReadOnly = false;
+try {
+  const testPath = path.join(__dirname, "..", "data", "write_test.txt");
+  const dir = path.dirname(testPath);
+  if (!fs.existsSync(dir)) {
+    fs.mkdirSync(dir, { recursive: true });
+  }
+  fs.writeFileSync(testPath, "test");
+  fs.unlinkSync(testPath);
+} catch (e) {
+  isReadOnly = true;
+}
+
+const fallbackHistoryPath = isReadOnly
   ? path.join("/tmp", "search_history.json")
   : path.join(__dirname, "..", "data", "search_history.json");
-const usersPath = isVercel
+const usersPath = isReadOnly
   ? path.join("/tmp", "users.json")
   : path.join(__dirname, "..", "data", "users.json");
 
 const { Pool } = pg;
 const dbUrl = process.env.DATABASE_URL;
 
-// On Vercel, if DATABASE_URL is not set or points to localhost/127.0.0.1, use fallback immediately
+// If the environment is read-only and DATABASE_URL is not set or points to localhost, use fallback immediately
 const isLocalDb = !dbUrl || dbUrl.includes("localhost") || dbUrl.includes("127.0.0.1");
-let useFallback = isVercel && isLocalDb;
+let useFallback = isReadOnly && isLocalDb;
 
 const connectionString = dbUrl || "postgresql://postgres:postgres@localhost:5432/tradebot";
 
